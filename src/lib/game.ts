@@ -7,7 +7,7 @@
  * in the React components.
  */
 
-import { DICT, isWord } from './dictionary';
+import { isWord } from './dictionary';
 import { LETTER_VALUES, SPACE, boardPoints } from './letterValues';
 
 /**
@@ -73,7 +73,7 @@ export function validateBoard(board: readonly string[]): ValidationResult {
 
   if (spaceCount === 0) {
     const word = board.join('');
-    if (DICT.has(word)) {
+    if (isWord(word)) {
       return { ok: true, words: [word] };
     }
     return { ok: false, reason: `"${word}" isn't in the dictionary` };

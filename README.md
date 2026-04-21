@@ -108,18 +108,17 @@ gapplet/
 │   ├── main.tsx                 # entry point
 │   ├── App.tsx                  # game component (the whole UI)
 │   ├── index.css                # Tailwind imports + custom styles
-│   ├── lib/
+│   ├── lib/                    # isomorphic — runs in browser AND Deno (Edge Functions)
+│   │   ├── wordList.ts          # dictionary source, embedded as a string export
 │   │   ├── letterValues.ts      # Scrabble letter values
-│   │   ├── dictionary.ts        # DICT set + loader
+│   │   ├── dictionary.ts        # lazy-init Set + isWord() over wordList
 │   │   ├── game.ts              # pure game logic (validate, neighbors, scoring)
-│   │   └── seeds.ts             # candidate seeds + scoring filter
-│   ├── components/
-│   │   ├── Board.tsx            # the 5-cell board
-│   │   ├── Stats.tsx            # time/score/chain cards
-│   │   ├── Controls.tsx         # submit/space/hint/reset buttons
-│   │   └── GameOver.tsx         # end-of-game summary
-│   └── data/
-│       └── words.txt            # the dictionary, one word per line
+│   │   └── seeds.ts             # candidate seeds + neighbor-count filter (lazy)
+│   └── components/
+│       ├── Board.tsx            # the 5-cell board
+│       ├── Stats.tsx            # time/score/chain cards
+│       ├── Controls.tsx         # submit/space/hint/reset buttons
+│       └── GameOver.tsx         # end-of-game summary
 ├── index.html
 ├── package.json
 ├── tsconfig.json

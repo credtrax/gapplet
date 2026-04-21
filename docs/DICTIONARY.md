@@ -2,14 +2,15 @@
 
 ## Current state
 
-`src/data/words.txt` contains ~6,650 words, hand-curated from the prototype's
-embedded string literal. It's enough for a playable game but has obvious
-gaps — common words will be missing, and players will run into validation
-failures that feel arbitrary ("QUARK isn't a word?!").
+`src/lib/wordList.ts` embeds ~6,650 words as a plain string constant
+(`WORDS_TEXT`), hand-curated from the prototype's embedded string literal.
+It's enough for a playable game but has obvious gaps — common words will
+be missing, and players will run into validation failures that feel
+arbitrary ("QUARK isn't a word?!").
 
 ## The upgrade
 
-Replace `src/data/words.txt` with a proper dictionary. Options:
+Regenerate `src/lib/wordList.ts` from a proper dictionary. Options:
 
 ### Option 1: ENABLE (recommended)
 
@@ -22,14 +23,16 @@ free Scrabble-friendly dictionary. It's in the public domain.
 To install:
 
 ```bash
-curl -o src/data/words.txt https://raw.githubusercontent.com/dolph/dictionary/master/enable.txt
-# convert to uppercase, one word per line, filter to 1-5 letter words only
+curl -o /tmp/enable.txt https://raw.githubusercontent.com/dolph/dictionary/master/enable.txt
+# Filter to 1-5 letter words, uppercase, sorted, dedup — then emit wordList.ts
 python3 -c "
-words = [w.strip().upper() for w in open('src/data/words.txt')]
-words = [w for w in words if 1 <= len(w) <= 5 and w.isalpha()]
-words = sorted(set(words))
-open('src/data/words.txt', 'w').write('\n'.join(words) + '\n')
-print(f'Kept {len(words)} words')
+words = [w.strip().upper() for w in open('/tmp/enable.txt')]
+words = sorted({w for w in words if 1 <= len(w) <= 5 and w.isalpha()})
+body = '\n'.join(words)
+with open('src/lib/wordList.ts', 'w') as f:
+    f.write('/**\n * Gapplet dictionary. Regenerate with docs/DICTIONARY.md instructions.\n */\n')
+    f.write('export const WORDS_TEXT = \`\n' + body + '\n\`;\n')
+print(f'Wrote {len(words)} words to src/lib/wordList.ts')
 "
 ```
 
@@ -51,24 +54,31 @@ domain-specific additions.
 
 ## Implementation notes
 
-The game loads the dictionary via Vite's `?raw` import:
+The word list lives in `src/lib/wordList.ts` as a plain TypeScript module
+exporting `WORDS_TEXT` (one word per newline). `src/lib/dictionary.ts`
+parses that string into a `Set<string>` lazily on first lookup.
 
-```typescript
-import rawWords from '../data/words.txt?raw';
-```
+This shape was chosen so the same file can be imported natively by:
 
-This inlines the file into the JS bundle at build time. A 10,000-word
-list is roughly 60KB — small enough to ship in the main bundle. A full
-170,000-word ENABLE list is roughly 1.8MB, which is too large to inline.
+- The browser via Vite (no `?raw` import needed)
+- Supabase Edge Functions via Deno (no platform-specific loader)
 
-If you use the full ENABLE list, split the loading:
+The server needs the same dictionary to validate scores authoritatively
+(see `docs/DESIGN.md` for why we don't trust client-reported scores).
+Having one `.ts` module means there is exactly one source of truth.
 
-1. Keep a small "common words" subset inlined (so the game is playable
-   instantly)
-2. Fetch the full dictionary async on page load
-3. Swap the DICT Set once the fetch completes
+A 10,000-word list is roughly 60KB as a string constant — small enough
+to ship in both the main browser bundle and the Edge Function bundle.
+A full 170,000-word ENABLE list is roughly 1.8MB, which is too large
+for either target. If you ever need the full list:
 
-For 1-5 letter words only, inlining is fine.
+1. Keep a small "common words" subset in wordList.ts (so the game is
+   playable instantly on cold-start)
+2. Fetch the full dictionary async on page load (client) / from Postgres
+   on cold-start (Edge Function)
+3. Swap the internal Set once the fetch completes
+
+For 1-5 letter words only, the inline approach is fine.
 
 ## Why only 1-5 letter words
 
@@ -87,14 +97,17 @@ save memory and lookup time.
 
 ## Testing dictionary coverage
 
-After a dictionary swap, run the seed filter and count eligible seeds:
+After a dictionary swap, sample `pickSeed()` a few times to spot-check
+the eligible-seed pool:
 
 ```typescript
-import { ELIGIBLE_SEEDS } from './src/lib/seeds';
-console.log(`${ELIGIBLE_SEEDS.length} eligible seeds`);
+import { pickSeed } from './src/lib/seeds';
+const seen = new Set<string>();
+for (let i = 0; i < 500; i++) seen.add(pickSeed());
+console.log(`${seen.size} distinct seeds observed`);
 ```
 
-With the current ~6,650-word list you should see around 50-80 eligible
+With the current ~6,650-word list you should see around 50-80 distinct
 seeds. With a full ENABLE subset you should see several hundred. If the
 number drops unexpectedly, something went wrong in the dictionary
 conversion.

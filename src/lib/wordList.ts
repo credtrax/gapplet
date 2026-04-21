@@ -1,3 +1,15 @@
+/**
+ * The Gapplet dictionary, embedded as a plain string.
+ *
+ * Stored as a .ts module (rather than .txt + Vite ?raw) so the same file
+ * can be imported natively by both the browser build AND by Supabase Edge
+ * Functions running under Deno. One source of truth, no platform-specific
+ * import gymnastics.
+ *
+ * ~6,650 common 2-to-5-letter words. Upgrade path to ENABLE (~170k) is in
+ * docs/DICTIONARY.md.
+ */
+export const WORDS_TEXT = `
 AA
 AB
 ABACK
@@ -6648,3 +6660,4 @@ ZONES
 ZOOM
 ZOOMS
 ZOOS
+`;

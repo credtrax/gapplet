@@ -22,7 +22,7 @@ tasks assume this works.
 
 ### 2. Swap in a real dictionary
 
-See `docs/DICTIONARY.md`. Replace `src/data/words.txt` with ENABLE
+See `docs/DICTIONARY.md`. Regenerate `src/lib/wordList.ts` from ENABLE
 (filtered to 1-5 letter words). Expected outcome: no more "QUARK isn't a
 word" surprises.
 

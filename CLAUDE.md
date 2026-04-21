@@ -48,8 +48,8 @@ directly; now we use React state.
 The handoff intentionally leaves several things unfinished because they need
 decisions, not just code. In rough priority order:
 
-1. **Dictionary upgrade.** The current `src/data/words.txt` is a ~4,500-word
-   subset I maintained by hand in the prototype. For production, load a real
+1. **Dictionary upgrade.** The current `src/lib/wordList.ts` embeds a ~6,650-word
+   subset maintained by hand in the prototype. For production, load a real
    dictionary like ENABLE (~170,000 words). See `docs/DICTIONARY.md`.
 2. **Get the dev server running.** Run `npm install && npm run dev` and verify
    the game plays end-to-end.

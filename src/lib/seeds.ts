@@ -6,13 +6,17 @@
  * Q-U must stay together. A seed with 3 neighbors produces a frustrating
  * 30-second game.
  *
- * At module init, we filter CANDIDATE_SEEDS to only keep seeds with at
- * least MIN_NEIGHBORS valid one-swap neighbors in our dictionary. The
- * result is ELIGIBLE_SEEDS.
+ * On first call to pickSeed(), we filter CANDIDATE_SEEDS to only keep seeds
+ * with at least MIN_NEIGHBORS valid one-swap neighbors in our dictionary.
+ * The filtered list is memoized.
+ *
+ * Lazy init (instead of module-load init) matters for Edge Functions: cold
+ * starts don't pay for neighbor computation unless the function actually
+ * picks a seed.
  */
 
 import { findNeighbors } from './game';
-import { DICT } from './dictionary';
+import { isWord } from './dictionary';
 
 const MIN_NEIGHBORS = 10;
 
@@ -54,34 +58,36 @@ const CANDIDATE_SEEDS: string[] = [
   'WRITE', 'WRONG', 'WROTE',
 ];
 
+let _eligible: readonly string[] | null = null;
+
 /**
- * Seeds that pass the neighbor-count filter. Computed once at module load.
- *
- * If the dictionary is swapped for a larger one, many more candidates will
- * qualify and this list grows automatically. No manual re-curation needed.
+ * Compute (and cache) the list of candidate seeds that pass the
+ * neighbor-count filter. Runs on first call, reused thereafter.
  */
-export const ELIGIBLE_SEEDS: readonly string[] = (() => {
+function getEligibleSeeds(): readonly string[] {
+  if (_eligible !== null) return _eligible;
   const scored: string[] = [];
   for (const seed of CANDIDATE_SEEDS) {
     if (seed.length !== 5) continue;
-    if (!DICT.has(seed)) continue;
+    if (!isWord(seed)) continue;
     const neighbors = findNeighbors(seed.split(''));
     if (neighbors.length >= MIN_NEIGHBORS) {
       scored.push(seed);
     }
   }
-  // Dedupe — in case the candidate list has duplicates.
-  return Array.from(new Set(scored));
-})();
+  _eligible = Array.from(new Set(scored));
+  return _eligible;
+}
 
 /**
  * Pick a random eligible seed. Falls back to STARE if for some reason no
  * candidates qualified (e.g., empty dictionary during tests).
  *
- * For daily puzzles, replace this with a deterministic function keyed on
- * UTC date. See ROADMAP.md.
+ * For daily shared puzzles (task #4), a deterministic variant keyed on UTC
+ * date will be added alongside this. Both will share getEligibleSeeds().
  */
 export function pickSeed(): string {
-  if (ELIGIBLE_SEEDS.length === 0) return 'STARE';
-  return ELIGIBLE_SEEDS[Math.floor(Math.random() * ELIGIBLE_SEEDS.length)];
+  const seeds = getEligibleSeeds();
+  if (seeds.length === 0) return 'STARE';
+  return seeds[Math.floor(Math.random() * seeds.length)];
 }
