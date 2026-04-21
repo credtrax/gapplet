@@ -9,8 +9,9 @@ type GameOverProps = {
 
 /**
  * The end-of-game summary card. Shown after the clock hits 0.
- * Displays every move, what word(s) it formed, points earned, and whether
- * it was hinted (with which minute the hint was used in).
+ * Row 1 shows the seed. Each later row shows the transition from the
+ * previous board state to the new one (`PREV → NEW +points`), so the
+ * chain reads naturally top-to-bottom.
  */
 export function GameOver({ history, score, startSeed }: GameOverProps) {
   const moves = history.length - 1;
@@ -55,10 +56,15 @@ export function GameOver({ history, score, startSeed }: GameOverProps) {
               </div>
             );
           }
+          const prevDisplay = history[i - 1].board
+            .map((c) => (c === SPACE ? '·' : c))
+            .join('');
           return (
             <div key={i}>
               <span style={{ color: 'var(--gapplet-muted)' }}>{i + 1}.</span>{' '}
-              <span style={{ fontWeight: 500 }}>{display}</span> — {h.words.join(' + ')}{' '}
+              <span style={{ color: 'var(--gapplet-muted)' }}>{prevDisplay}</span>
+              <span style={{ color: 'var(--gapplet-muted)' }}>{' → '}</span>
+              <span style={{ fontWeight: 500 }}>{display}</span>{' '}
               <span style={{ color: 'var(--gapplet-success)' }}>+{h.points}</span>
               {h.hinted && h.minuteUsed != null && (
                 <span style={{ color: 'var(--gapplet-hint)' }}>

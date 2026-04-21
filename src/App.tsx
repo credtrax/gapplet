@@ -81,6 +81,11 @@ export function App() {
   // --- Interaction ---
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [pendingHint, setPendingHint] = useState<Neighbor | null>(null);
+  // When the player hits Remove, they've made one logical move but the
+  // board representation changes in 2+ cells (everything shifts left).
+  // This flag lets attemptSubmit bypass the countDiffs ≤ 1 check while
+  // still running validateBoard and seen-configs.
+  const [pendingRemoveSource, setPendingRemoveSource] = useState<number | null>(null);
 
   // --- Hint budget ---
   const [hintsByWindow, setHintsByWindow] = useState<HintsByWindow>({ 1: 0, 2: 0 });
@@ -175,6 +180,7 @@ export function App() {
     setGameOver(false);
     setSelectedIdx(null);
     setPendingHint(null);
+    setPendingRemoveSource(null);
     setHintsByWindow({ 1: 0, 2: 0 });
     setStatusMessage('Ready — click any cell to start the clock.');
     setStatusTone('info');
@@ -188,17 +194,20 @@ export function App() {
       return;
     }
     const prev = history[history.length - 1].board;
-    const diffs = countDiffs(prev, board);
-    if (diffs === 0) {
-      setStatusMessage("You haven't changed anything yet.");
-      setStatusTone('danger');
-      return;
-    }
-    if (diffs > 1) {
-      setStatusMessage(`Only one cell can change per move. Currently changed: ${diffs}`);
-      setStatusTone('danger');
-      setChain(CHAIN_START);
-      return;
+    const isRemoveMove = pendingRemoveSource != null;
+    if (!isRemoveMove) {
+      const diffs = countDiffs(prev, board);
+      if (diffs === 0) {
+        setStatusMessage("You haven't changed anything yet.");
+        setStatusTone('danger');
+        return;
+      }
+      if (diffs > 1) {
+        setStatusMessage(`Only one cell can change per move. Currently changed: ${diffs}`);
+        setStatusTone('danger');
+        setChain(CHAIN_START);
+        return;
+      }
     }
     const v = validateBoard(board);
     if (!v.ok) {
@@ -208,6 +217,7 @@ export function App() {
       setBoard(prev.slice());
       setSelectedIdx(null);
       setPendingHint(null);
+      setPendingRemoveSource(null);
       return;
     }
     const key = boardKey(board);
@@ -218,6 +228,7 @@ export function App() {
       setBoard(prev.slice());
       setSelectedIdx(null);
       setPendingHint(null);
+      setPendingRemoveSource(null);
       return;
     }
 
@@ -262,6 +273,7 @@ export function App() {
     ]);
     setSelectedIdx(null);
     setPendingHint(null);
+    setPendingRemoveSource(null);
   };
 
   const insertSpace = () => {
@@ -273,12 +285,48 @@ export function App() {
     }
     maybeStartClock();
     setPendingHint(null);
+    setPendingRemoveSource(null);
     setBoard((prev) => {
       const next = prev.slice();
       next[selectedIdx] = SPACE;
       return next;
     });
     setStatusMessage(`Cell ${selectedIdx + 1} is now a space. Press Enter to submit.`);
+    setStatusTone(null);
+  };
+
+  /**
+   * Remove the letter at the selected cell and shift everything to the right
+   * of it one position left, leaving a trailing space. E.g. HEARD with A
+   * selected becomes HERD·. This changes multiple cells in the board array
+   * but counts as one logical move — attemptSubmit uses pendingRemoveSource
+   * to bypass the countDiffs ≤ 1 rule while still running validateBoard.
+   */
+  const removeLetter = () => {
+    if (gameOver) return;
+    if (selectedIdx == null) {
+      setStatusMessage('Click a letter cell first, then press Remove to shift the board left.');
+      setStatusTone('danger');
+      return;
+    }
+    if (board[selectedIdx] === SPACE) {
+      setStatusMessage('Nothing to remove at that cell — it is already a space.');
+      setStatusTone('danger');
+      return;
+    }
+    maybeStartClock();
+    const removedChar = board[selectedIdx];
+    setPendingHint(null);
+    setBoard((prev) => [
+      ...prev.slice(0, selectedIdx),
+      ...prev.slice(selectedIdx + 1),
+      SPACE,
+    ]);
+    setPendingRemoveSource(selectedIdx);
+    setSelectedIdx(null);
+    setStatusMessage(
+      `Removed "${removedChar}" — letters shifted, trailing space added. Press Enter to submit.`
+    );
     setStatusTone(null);
   };
 
@@ -314,6 +362,7 @@ export function App() {
 
     const choice = unseen[Math.floor(Math.random() * unseen.length)];
     setPendingHint(choice);
+    setPendingRemoveSource(null);
     setBoard(choice.board.slice());
     setSelectedIdx(choice.changedIdx);
 
@@ -339,10 +388,16 @@ export function App() {
         attemptSubmit();
         return;
       }
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        removeLetter();
+        return;
+      }
       if (selectedIdx == null) return;
       if (/^[a-zA-Z]$/.test(e.key)) {
         maybeStartClock();
         setPendingHint(null); // typing a letter cancels any pending hint
+        setPendingRemoveSource(null);
         setBoard((prev) => {
           const next = prev.slice();
           next[selectedIdx] = e.key.toUpperCase();
@@ -369,7 +424,7 @@ export function App() {
     // Intentionally re-subscribe when these change so the closure captures
     // fresh values. With more state, we'd pull this into a custom hook.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIdx, board, gameOver, timerStarted, chain, pendingHint, history, seenConfigs]);
+  }, [selectedIdx, board, gameOver, timerStarted, chain, pendingHint, pendingRemoveSource, history, seenConfigs]);
 
   // ------------------------------------------------------------------
   // Hint button label (derived from state)
@@ -471,6 +526,10 @@ export function App() {
       <Controls
         onSubmit={attemptSubmit}
         onInsertSpace={insertSpace}
+        onRemoveLetter={removeLetter}
+        removeButtonDisabled={
+          gameOver || selectedIdx == null || board[selectedIdx] === SPACE
+        }
         onBuyHint={buyHint}
         onReset={resetGame}
         hintButtonLabel={hintButtonLabel}
@@ -510,10 +569,11 @@ export function App() {
           How to play
         </div>
         <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
-          Change exactly one cell per move — swap a letter or toggle a space. The result
-          must be a valid 5-letter word, a 4-letter word with a space at either end, or
-          two valid words split by an interior space. Rare letters score more. Each good
-          move adds 0.2 to your chain; invalid moves or repeats reset it to ×1.0.
+          Each move: swap a letter, toggle a space, or <strong>remove</strong> a letter
+          (the rest shifts left, a trailing space appears). The result must be a valid
+          5-letter word, a 4-letter word with a space at either end, or two valid words
+          split by an interior space. Rare letters score more. Each good move adds 0.2
+          to your chain; invalid moves or repeats reset it to ×1.0.{' '}
           <strong>Buy a guess</strong>: one hint per minute of play, no stacking.
         </div>
       </div>

@@ -1,6 +1,8 @@
 type ControlsProps = {
   onSubmit: () => void;
   onInsertSpace: () => void;
+  onRemoveLetter: () => void;
+  removeButtonDisabled: boolean;
   onBuyHint: () => void;
   onReset: () => void;
   /** Label for the hint button, which varies with state */
@@ -10,13 +12,15 @@ type ControlsProps = {
 };
 
 /**
- * The row of action buttons. The hint button's label and disabled state
- * are passed in from App because they depend on timer state, which App
- * owns.
+ * The row of action buttons. The hint and remove buttons' disabled state
+ * are passed in from App because they depend on game state (timer, current
+ * cell contents) that App owns.
  */
 export function Controls({
   onSubmit,
   onInsertSpace,
+  onRemoveLetter,
+  removeButtonDisabled,
   onBuyHint,
   onReset,
   hintButtonLabel,
@@ -32,15 +36,28 @@ export function Controls({
         Insert space
       </button>
       <button
+        onClick={onRemoveLetter}
+        disabled={removeButtonDisabled}
+        style={{ flex: 1, minWidth: '130px' }}
+      >
+        Remove (⌫)
+      </button>
+      <button
         onClick={onBuyHint}
         disabled={hintButtonDisabled}
         style={{ flex: 1, minWidth: '150px' }}
       >
         {hintButtonLabel}
       </button>
-      <button onClick={onReset} style={{ flex: 1, minWidth: '110px' }}>
-        New game
-      </button>
+      {import.meta.env.DEV && (
+        <button
+          onClick={onReset}
+          style={{ flex: 1, minWidth: '110px', opacity: 0.7 }}
+          title="Dev-only: restart with a random seed. Hidden in production (daily-shared puzzle)."
+        >
+          New game (dev)
+        </button>
+      )}
     </div>
   );
 }
