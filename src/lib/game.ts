@@ -60,8 +60,10 @@ export function countDiffs(a: readonly string[], b: readonly string[]): number {
  *
  * Rules:
  * - 0 spaces: the 5 letters must form a single dictionary word
- * - 1 space: the letters on either side must each form valid words
- *   (single-letter words allowed only for A and I)
+ * - 1 space: the space can land anywhere — interior (splits the board into
+ *   two words) or at either edge (leaves a single 4-letter word). Each
+ *   non-empty segment must be a valid word. Single-letter words allowed
+ *   only for A and I.
  * - 2+ spaces: invalid
  */
 export function validateBoard(board: readonly string[]): ValidationResult {
@@ -80,11 +82,10 @@ export function validateBoard(board: readonly string[]): ValidationResult {
   }
 
   if (spaceCount === 1) {
+    // parts.length is 1 when the space is at either edge (e.g. " CARS" or
+    // "CARS "), giving one 4-letter word. It's 2 when the space is interior,
+    // giving two words like "A CAT" → ["A", "CAT"].
     const parts = board.join('').split(SPACE).filter((p) => p.length > 0);
-    if (parts.length !== 2) {
-      // This shouldn't happen if spaceCount is exactly 1, but guard anyway.
-      return { ok: false, reason: 'space must split two words' };
-    }
     for (const p of parts) {
       if (!isWord(p)) {
         return { ok: false, reason: `"${p}" isn't in the dictionary` };

@@ -511,9 +511,10 @@ export function App() {
         </div>
         <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
           Change exactly one cell per move — swap a letter or toggle a space. The result
-          must be a valid word, or two valid words split by one space. Rare letters score
-          more. Each good move adds 0.2 to your chain; invalid moves or repeats reset it
-          to ×1.0. <strong>Buy a guess</strong>: one hint per minute of play, no stacking.
+          must be a valid 5-letter word, a 4-letter word with a space at either end, or
+          two valid words split by an interior space. Rare letters score more. Each good
+          move adds 0.2 to your chain; invalid moves or repeats reset it to ×1.0.
+          <strong>Buy a guess</strong>: one hint per minute of play, no stacking.
         </div>
       </div>
 

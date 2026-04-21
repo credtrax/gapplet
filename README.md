@@ -6,18 +6,19 @@ build the longest valid chain you can.
 ## Concept
 
 The board has **5 cells**. Each cell holds either a letter or a space (the "gap"
-in Gapplet). The cells read left-to-right as either:
+in Gapplet). A board is valid when it reads left-to-right as any of:
 
-- One 5-letter word: `HEART`
-- Two valid words split by one space: `ON OF` (2+2), `A CAT` + a filler... wait,
-  let me restate: with one space, the 4 remaining letters form two words, split
-  at the space. Valid arrangements: 1+3 (e.g. `I CAT` + space in position 2,
-  giving `I CAT.` which is really `I·CATS`-style — see `validateBoard()` for the
-  canonical rule), 2+2, 3+1.
+- One 5-letter word, no space: `HEART`
+- A 4-letter word with one edge space: ` CARS` or `CARS `
+- Two valid words split by one interior space: `A CATS` (1+3), `ON OF` (2+2),
+  `CAT A` (3+1)
+
+Two or more spaces is never valid. Single-letter words are restricted to `A`
+and `I` — no `O`, no `K`, even though some Scrabble dictionaries include them.
 
 Each turn the player **changes exactly one cell** — swaps a letter, turns a
 letter into a space, or turns a space into a letter. The result must validate
-(single word or two-words-split-by-space).
+per the rules above.
 
 ## Scoring
 

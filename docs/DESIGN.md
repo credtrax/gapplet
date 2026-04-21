@@ -24,7 +24,9 @@ Four cells makes the single-space arrangements cramped (1+2 or 2+1 — not
 much room to find valid word pairs). Six cells makes the single-word
 state too hard (few common English 6-letter words are one-swap neighbors
 of each other). Five is the sweet spot: Wordle territory for single
-words, and enough room for 2+2 or 1+3 splits when a space is present.
+words, and enough room for the full variety of space-placements when a
+space is present: edge (4-letter word plus leading or trailing space),
+1+3, 2+2, and 3+1 splits.
 
 ## Scrabble letter values, verbatim
 
