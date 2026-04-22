@@ -6,6 +6,8 @@ type ControlsProps = {
   onRemoveLetter: () => void;
   removeButtonDisabled: boolean;
   onBuyHint: () => void;
+  onBackToStart: () => void;
+  backToStartDisabled: boolean;
   onReset: () => void;
   /** Label for the hint button, which varies with state */
   hintButtonLabel: string;
@@ -14,9 +16,10 @@ type ControlsProps = {
 };
 
 /**
- * The row of action buttons. The hint, remove, and restore buttons' disabled
- * state are passed in from App because they depend on game state (timer,
- * current cell contents, diff from last committed board) that App owns.
+ * The row of action buttons. The hint, remove, restore, and back-to-start
+ * buttons' disabled state are passed in from App because they depend on
+ * game state (timer, current cell contents, diff from last committed
+ * board, hard-mode setting) that App owns.
  */
 export function Controls({
   onSubmit,
@@ -26,6 +29,8 @@ export function Controls({
   onRemoveLetter,
   removeButtonDisabled,
   onBuyHint,
+  onBackToStart,
+  backToStartDisabled,
   onReset,
   hintButtonLabel,
   hintButtonDisabled,
@@ -59,6 +64,14 @@ export function Controls({
         style={{ flex: 1, minWidth: '150px' }}
       >
         {hintButtonLabel}
+      </button>
+      <button
+        onClick={onBackToStart}
+        disabled={backToStartDisabled}
+        style={{ flex: 1, minWidth: '130px' }}
+        title="Return to the seed word and restart the chain. Previous path stays blocked. Chain resets to ×1.0. Disabled in hard mode."
+      >
+        Back to start
       </button>
       {import.meta.env.DEV && (
         <button

@@ -72,6 +72,12 @@ export function GameOver({ history, score, startSeed }: GameOverProps) {
                   [hint • min {h.minuteUsed}]
                 </span>
               )}
+              {h.restructured && (
+                <span style={{ color: 'var(--gapplet-accent)' }}>
+                  {' '}
+                  [back to start]
+                </span>
+              )}
             </div>
           );
         })}

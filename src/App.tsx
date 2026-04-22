@@ -33,6 +33,12 @@ export type HistoryEntry = {
   hinted: boolean;
   /** Which minute the hint was used in (1 or 2), or null for normal moves */
   minuteUsed: number | null;
+  /**
+   * True if this entry represents the player bailing out of a dead-end by
+   * hitting "Back to start" — board reverts to the seed, chain resets, but
+   * seenConfigs retain the previous path so it can't be re-walked.
+   */
+  restructured?: boolean;
 };
 
 /**
@@ -309,6 +315,49 @@ export function App() {
   };
 
   /**
+   * Return the board to the original seed word. Chain resets to 1.0 as the
+   * cost. Previously-played configurations stay in seenConfigs, so the
+   * player must find a different path through the word graph — they can't
+   * just replay the abandoned chain. Two use cases:
+   *   1. Dead-end rescue: unusedNeighborCount === 0, no move possible.
+   *   2. Strategic branch-switch: player decides their current first-move
+   *      branch isn't going anywhere good, pays chain to try a different
+   *      step-1 word from the seed.
+   *
+   * Disabled when: the committed board is already the seed (nothing to
+   * abandon), game is over, or hard mode is active (future feature —
+   * HARD_MODE constant placeholder for now).
+   */
+  const HARD_MODE = false; // TODO: wire to a real setting once hard mode lands
+  const backToStart = () => {
+    if (gameOver) return;
+    if (HARD_MODE) return;
+    if (history[history.length - 1].board.join('') === startSeed) return;
+    const seedBoard = startSeed.split('');
+    setBoard(seedBoard);
+    setChain(CHAIN_START);
+    setHistory((prev) => [
+      ...prev,
+      {
+        board: seedBoard.slice(),
+        words: [startSeed],
+        points: 0,
+        initial: false,
+        hinted: false,
+        minuteUsed: null,
+        restructured: true,
+      },
+    ]);
+    setSelectedIdx(null);
+    setPendingHint(null);
+    setPendingRemoveSource(null);
+    setStatusMessage(
+      `Back to ${startSeed}. Chain reset to ×1.0. Previous path stays blocked — find a new first move.`
+    );
+    setStatusTone('warning');
+  };
+
+  /**
    * Revert any uncommitted edits, restoring the board to the last
    * successfully-submitted state (or the seed, if no moves yet). Doesn't
    * touch chain, score, history, or the timer — this is a pre-commit
@@ -574,6 +623,11 @@ export function App() {
           gameOver || selectedIdx == null || board[selectedIdx] === SPACE
         }
         onBuyHint={buyHint}
+        onBackToStart={backToStart}
+        backToStartDisabled={
+          gameOver || HARD_MODE ||
+          history[history.length - 1].board.join('') === startSeed
+        }
         onReset={resetGame}
         hintButtonLabel={hintButtonLabel}
         hintButtonDisabled={hintButtonDisabled}
