@@ -4,6 +4,7 @@ import { Stats } from './components/Stats';
 import { GameOver } from './components/GameOver';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { AuthButton } from './components/AuthButton';
+import { HowToPlay } from './components/HowToPlay';
 import { pickSeed, pickSeedForDate, utcDateString } from './lib/seeds';
 import { useAuth } from './lib/auth';
 import { supabase } from './lib/supabase';
@@ -143,6 +144,25 @@ export function App() {
   // --- End-of-game score submission ---
   const { session } = useAuth();
   const [submission, setSubmission] = useState<SubmissionState>({ status: 'idle' });
+
+  // --- How-to-play tutorial ---
+  // Auto-opens on first visit (localStorage-gated). Reopens anytime via the
+  // "?" button in the header.
+  const [showHowTo, setShowHowTo] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('gapplet:seen-howto');
+    } catch {
+      return false;
+    }
+  });
+  const closeHowTo = () => {
+    setShowHowTo(false);
+    try {
+      localStorage.setItem('gapplet:seen-howto', '1');
+    } catch {
+      /* private-mode storage disabled — fine, they'll re-see the tutorial */
+    }
+  };
   const [statusTone, setStatusTone] = useState<MessageTone>('info');
 
   // ------------------------------------------------------------------
@@ -763,7 +783,7 @@ export function App() {
             Seed: {startSeed}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
           <Stats
             timeLeft={timeLeft}
             score={score}
@@ -771,6 +791,18 @@ export function App() {
             timerStarted={timerStarted}
             neighborCount={import.meta.env.DEV ? unusedNeighborCount : undefined}
           />
+          <button
+            onClick={() => setShowHowTo(true)}
+            aria-label="How to play"
+            title="How to play"
+            style={{
+              fontSize: '14px',
+              padding: '0.35rem 0.6rem',
+              fontWeight: 600,
+            }}
+          >
+            ?
+          </button>
           <AuthButton />
         </div>
       </div>
@@ -868,6 +900,7 @@ export function App() {
           submission={submission}
         />
       )}
+      {showHowTo && <HowToPlay onClose={closeHowTo} />}
     </div>
   );
 }
