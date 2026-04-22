@@ -4,7 +4,9 @@ import { Stats } from './components/Stats';
 import { GameOver } from './components/GameOver';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { AuthButton } from './components/AuthButton';
-import { pickSeed, todaySeed } from './lib/seeds';
+import { pickSeed, pickSeedForDate, utcDateString } from './lib/seeds';
+import { useAuth } from './lib/auth';
+import { supabase } from './lib/supabase';
 import {
   validateBoard,
   findNeighbors,
@@ -60,22 +62,43 @@ type HintsByWindow = { 1: number; 2: number };
 type MessageTone = 'info' | 'success' | 'warning' | 'danger' | null;
 
 /**
- * Choose the initial seed for this game. Daily shared puzzle by default
- * (same word for every player on a given UTC date). Practice mode, opted
- * into via `?practice=1` in the URL, picks a random eligible seed instead
- * — used for local dev and for players who want another go without
- * posting to the leaderboard.
+ * Lock the game's identity — seed word, the UTC date it's anchored to, and
+ * whether it's a practice game — at mount time. All three as a unit because
+ * submission back to the server (task #8) needs the exact (seed_date)
+ * the player started with, to survive the midnight boundary.
  */
-function pickInitialSeed(): string {
-  if (typeof window === 'undefined') return todaySeed();
-  const isPractice = new URLSearchParams(window.location.search).has('practice');
-  return isPractice ? pickSeed() : todaySeed();
+function initGame(): { seed: string; seedDate: string; isPractice: boolean } {
+  const isPractice =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('practice');
+  const seedDate = utcDateString();
+  const seed = isPractice ? pickSeed() : pickSeedForDate(seedDate);
+  return { seed, seedDate, isPractice };
 }
+
+/**
+ * Submission state for the end-of-game leaderboard post. Only the `idle`
+ * state triggers a POST; everything else is terminal for this game.
+ */
+type SubmissionState =
+  | { status: 'idle' }
+  | { status: 'submitting' }
+  | {
+      status: 'succeeded';
+      gameId: number;
+      finalScore: number;
+      chainPeak: number;
+    }
+  | { status: 'failed'; error: string }
+  | { status: 'duplicate' }
+  | { status: 'unauthenticated' }
+  | { status: 'practice' };
 
 export function App() {
   // --- Core game state ---
-  const [board, setBoard] = useState<BoardType>(() => pickInitialSeed().split(''));
-  const [startSeed] = useState<string>(() => board.join(''));
+  const [{ seed: startSeed, seedDate: startSeedDate, isPractice: isPracticeMode }] =
+    useState(initGame);
+  const [board, setBoard] = useState<BoardType>(() => startSeed.split(''));
   const [score, setScore] = useState(0);
   const [chain, setChain] = useState(CHAIN_START);
   const [history, setHistory] = useState<HistoryEntry[]>(() => [
@@ -114,6 +137,10 @@ export function App() {
   const [statusMessage, setStatusMessage] = useState<string>(
     'Ready — click any cell to start the clock.'
   );
+
+  // --- End-of-game score submission ---
+  const { session } = useAuth();
+  const [submission, setSubmission] = useState<SubmissionState>({ status: 'idle' });
   const [statusTone, setStatusTone] = useState<MessageTone>('info');
 
   // ------------------------------------------------------------------
@@ -128,6 +155,132 @@ export function App() {
     const w = currentWindow();
     return hintsByWindow[w] > 0 ? 0 : 1;
   };
+
+  // ------------------------------------------------------------------
+  // Score submission on game-end
+  // ------------------------------------------------------------------
+
+  // Main submit effect: fires once on game-end, POSTs moves to the
+  // validate-score Edge Function (task #7). Server replays against the
+  // authoritative seed and inserts into games via service_role.
+  useEffect(() => {
+    if (!gameOver) return;
+    if (submission.status !== 'idle') return;
+
+    if (isPracticeMode) {
+      setSubmission({ status: 'practice' });
+      return;
+    }
+    if (!session) {
+      setSubmission({ status: 'unauthenticated' });
+      return;
+    }
+
+    // history[0] is the seed marker. Skip it; submit only played entries.
+    const moves = history.slice(1).map((h) => ({
+      board: h.board,
+      hinted: h.hinted,
+      minuteUsed: h.minuteUsed as 1 | 2 | null,
+      restructured: h.restructured ?? false,
+    }));
+    if (moves.length === 0) {
+      // No actual moves — nothing to post. Stay idle (don't publish an empty game).
+      return;
+    }
+
+    setSubmission({ status: 'submitting' });
+
+    (async () => {
+      try {
+        // Explicitly attach the current session JWT so there's no reliance
+        // on the invoke() default header behavior. Also mirrors what the
+        // Edge Function's `Authorization: Bearer <jwt>` check expects.
+        const accessToken = session.access_token;
+
+        const result = await supabase.functions.invoke('validate-score', {
+          body: { seed_date: startSeedDate, hard_mode: false, moves },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        // Non-2xx responses: supabase-js wraps them in FunctionsHttpError whose
+        // `.context` is the raw Response. Pull the body to surface the server's
+        // actual error text ("move 3: …" rather than "non-2xx status").
+        if (result.error) {
+          const ctx = (result.error as { context?: Response }).context;
+          let bodyText = '';
+          let body: { ok?: boolean; error?: string; code?: string; message?: string } | null = null;
+          if (ctx && typeof ctx.clone === 'function') {
+            try {
+              bodyText = await ctx.clone().text();
+              try {
+                body = JSON.parse(bodyText);
+              } catch {
+                /* not JSON */
+              }
+            } catch {
+              /* couldn't read */
+            }
+          }
+          // Flatten for Safari-friendly console output
+          console.error(
+            'validate-score error:\n' +
+              JSON.stringify(
+                {
+                  status: ctx?.status,
+                  statusText: ctx?.statusText,
+                  bodyText,
+                  bodyParsed: body,
+                  rawMessage: result.error.message,
+                },
+                null,
+                2
+              )
+          );
+          // Gateway-level 401 returns { code, message }; function-level returns { ok, error }
+          const serverMsg = body?.error ?? body?.message ?? result.error.message ?? 'submission failed';
+          if (body?.error && /already submitted/i.test(body.error)) {
+            setSubmission({ status: 'duplicate' });
+          } else {
+            setSubmission({ status: 'failed', error: serverMsg });
+          }
+          return;
+        }
+
+        const d = result.data as
+          | { ok: true; game_id: number; final_score: number; chain_peak: number }
+          | { ok: false; error: string };
+        if (!d.ok) {
+          if (/already submitted/i.test(d.error)) {
+            setSubmission({ status: 'duplicate' });
+          } else {
+            setSubmission({ status: 'failed', error: d.error });
+          }
+          return;
+        }
+        setSubmission({
+          status: 'succeeded',
+          gameId: d.game_id,
+          finalScore: d.final_score,
+          chainPeak: d.chain_peak,
+        });
+      } catch (e) {
+        console.error('validate-score threw:', e);
+        setSubmission({
+          status: 'failed',
+          error: (e as Error).message ?? 'submission failed',
+        });
+      }
+    })();
+  }, [gameOver, submission.status, isPracticeMode, session, history, startSeedDate]);
+
+  // If the player signs in post-game-end, reset to idle so the main effect
+  // re-fires and actually submits. Only triggers on the unauthenticated→
+  // signed-in transition for this game.
+  useEffect(() => {
+    if (session && submission.status === 'unauthenticated') {
+      setSubmission({ status: 'idle' });
+    }
+  }, [session, submission.status]);
 
   /**
    * How many unused one-swap neighbors exist from the last committed board?
@@ -688,7 +841,14 @@ export function App() {
         </div>
       </div>
 
-      {gameOver && <GameOver history={history} score={score} startSeed={startSeed} />}
+      {gameOver && (
+        <GameOver
+          history={history}
+          score={score}
+          startSeed={startSeed}
+          submission={submission}
+        />
+      )}
     </div>
   );
 }

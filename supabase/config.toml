@@ -375,6 +375,14 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Per-function config. verify_jwt = false tells the Supabase gateway not to
+# validate the incoming JWT — the function's own code does it via
+# auth.getUser(), which understands both legacy HS256 and the newer
+# ES256/RS256 signing keys. Without this, the gateway's legacy verifier
+# rejects ES256-signed JWTs with "Unsupported JWT algorithm ES256".
+[functions.validate-score]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

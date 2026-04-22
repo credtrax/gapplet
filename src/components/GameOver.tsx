@@ -1,10 +1,20 @@
 import { SPACE } from '../lib/letterValues';
 import type { HistoryEntry } from '../App';
 
+type SubmissionState =
+  | { status: 'idle' }
+  | { status: 'submitting' }
+  | { status: 'succeeded'; gameId: number; finalScore: number; chainPeak: number }
+  | { status: 'failed'; error: string }
+  | { status: 'duplicate' }
+  | { status: 'unauthenticated' }
+  | { status: 'practice' };
+
 type GameOverProps = {
   history: HistoryEntry[];
   score: number;
   startSeed: string;
+  submission: SubmissionState;
 };
 
 /**
@@ -12,8 +22,12 @@ type GameOverProps = {
  * Row 1 shows the seed. Each later row shows the transition from the
  * previous board state to the new one (`PREV → NEW +points`), so the
  * chain reads naturally top-to-bottom.
+ *
+ * Also renders the leaderboard-submission status. Game-end triggers a
+ * POST to the validate-score Edge Function for signed-in daily-mode
+ * games; the card surfaces success / failure / skip states inline.
  */
-export function GameOver({ history, score, startSeed }: GameOverProps) {
+export function GameOver({ history, score, startSeed, submission }: GameOverProps) {
   const moves = history.length - 1;
   const hintedCount = history.filter((h) => h.hinted).length;
 
@@ -30,9 +44,11 @@ export function GameOver({ history, score, startSeed }: GameOverProps) {
       <div style={{ fontSize: '16px', fontWeight: 500, marginBottom: '0.5rem' }}>
         Game over
       </div>
-      <div style={{ fontSize: '13px', color: 'var(--gapplet-muted)', marginBottom: '1rem' }}>
+      <div style={{ fontSize: '13px', color: 'var(--gapplet-muted)', marginBottom: '0.75rem' }}>
         Final score: {score} over {moves} moves ({hintedCount} hinted). Seed: {startSeed}.
       </div>
+      <SubmissionBadge submission={submission} />
+      <div style={{ height: '1rem' }} />
       <div
         style={{
           fontSize: '11px',
@@ -84,4 +100,53 @@ export function GameOver({ history, score, startSeed }: GameOverProps) {
       </div>
     </div>
   );
+}
+
+function SubmissionBadge({ submission }: { submission: SubmissionState }) {
+  const base: React.CSSProperties = {
+    fontSize: '13px',
+    padding: '6px 10px',
+    borderRadius: '6px',
+    display: 'inline-block',
+  };
+  switch (submission.status) {
+    case 'idle':
+      return null;
+    case 'submitting':
+      return (
+        <div style={{ ...base, background: 'rgba(0, 0, 0, 0.04)', color: 'var(--gapplet-muted)' }}>
+          Submitting score…
+        </div>
+      );
+    case 'succeeded':
+      return (
+        <div style={{ ...base, background: 'rgba(5, 150, 105, 0.1)', color: 'var(--gapplet-success)' }}>
+          ✓ Posted to leaderboard · verified {submission.finalScore} pts · ×{submission.chainPeak.toFixed(1)} peak
+        </div>
+      );
+    case 'duplicate':
+      return (
+        <div style={{ ...base, background: 'rgba(0, 0, 0, 0.04)', color: 'var(--gapplet-muted)' }}>
+          Already submitted a score for today's puzzle. Come back tomorrow.
+        </div>
+      );
+    case 'unauthenticated':
+      return (
+        <div style={{ ...base, background: 'rgba(59, 130, 246, 0.08)', color: 'var(--gapplet-accent)' }}>
+          Sign in to post this score to the leaderboard.
+        </div>
+      );
+    case 'practice':
+      return (
+        <div style={{ ...base, background: 'rgba(0, 0, 0, 0.04)', color: 'var(--gapplet-muted)' }}>
+          Practice game — not posted to leaderboard.
+        </div>
+      );
+    case 'failed':
+      return (
+        <div style={{ ...base, background: 'rgba(220, 38, 38, 0.08)', color: 'var(--gapplet-danger)' }}>
+          Failed to post: {submission.error}
+        </div>
+      );
+  }
 }
