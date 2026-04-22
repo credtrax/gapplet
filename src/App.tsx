@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Board } from './components/Board';
 import { Stats } from './components/Stats';
-import { Controls } from './components/Controls';
 import { GameOver } from './components/GameOver';
+import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { pickSeed } from './lib/seeds';
 import {
   validateBoard,
@@ -61,7 +61,7 @@ type MessageTone = 'info' | 'success' | 'warning' | 'danger' | null;
 export function App() {
   // --- Core game state ---
   const [board, setBoard] = useState<BoardType>(() => pickSeed().split(''));
-  const [startSeed, setStartSeed] = useState<string>(() => board.join(''));
+  const [startSeed] = useState<string>(() => board.join(''));
   const [score, setScore] = useState(0);
   const [chain, setChain] = useState(CHAIN_START);
   const [history, setHistory] = useState<HistoryEntry[]>(() => [
@@ -175,36 +175,6 @@ export function App() {
   // Actions
   // ------------------------------------------------------------------
 
-  const resetGame = () => {
-    stopTimer();
-    const newSeed = pickSeed();
-    const newBoard = newSeed.split('');
-    setBoard(newBoard);
-    setStartSeed(newSeed);
-    setScore(0);
-    setChain(CHAIN_START);
-    setHistory([
-      {
-        board: newBoard.slice(),
-        words: [newSeed],
-        points: 0,
-        initial: true,
-        hinted: false,
-        minuteUsed: null,
-      },
-    ]);
-    setSeenConfigs(new Set([boardKey(newBoard)]));
-    setTimeLeft(GAME_DURATION_SECONDS);
-    setTimerStarted(false);
-    setGameOver(false);
-    setSelectedIdx(null);
-    setPendingHint(null);
-    setPendingRemoveSource(null);
-    setHintsByWindow({ 1: 0, 2: 0 });
-    setStatusMessage('Ready — click any cell to start the clock.');
-    setStatusTone('info');
-  };
-
   const attemptSubmit = () => {
     if (gameOver) return;
     if (!timerStarted) {
@@ -315,21 +285,39 @@ export function App() {
   };
 
   /**
-   * Return the board to the original seed word. Chain resets to 1.0 as the
-   * cost. Previously-played configurations stay in seenConfigs, so the
-   * player must find a different path through the word graph — they can't
-   * just replay the abandoned chain. Two use cases:
-   *   1. Dead-end rescue: unusedNeighborCount === 0, no move possible.
-   *   2. Strategic branch-switch: player decides their current first-move
-   *      branch isn't going anywhere good, pays chain to try a different
-   *      step-1 word from the seed.
+   * "Revert to last successful word" — undo any uncommitted edits and put
+   * the board back to the last successfully-submitted state (or the seed,
+   * if no moves yet). Chain, score, history, timer all unchanged. This is
+   * the pre-commit safety net for "I clicked wrong." Bound to physical Esc.
+   */
+  const revertToLastWord = () => {
+    if (gameOver) return;
+    const lastValid = history[history.length - 1].board;
+    if (countDiffs(lastValid, board) === 0) return;
+    setBoard(lastValid.slice());
+    setSelectedIdx(null);
+    setPendingHint(null);
+    setPendingRemoveSource(null);
+    setStatusMessage('Reverted to the last committed word. Keep going.');
+    setStatusTone('info');
+  };
+
+  /**
+   * "Restart chain" — return the board to the original seed word. Chain
+   * resets to ×1.0 as the cost. Previously-played configurations stay in
+   * seenConfigs, so the player must find a different path through the
+   * word graph — they can't just replay the abandoned chain. Two use cases:
+   *   1. Dead-end rescue: current board has no unplayed one-swap neighbors.
+   *   2. Strategic branch-switch: player decides their first-move branch
+   *      isn't going anywhere good and pays chain to try a different step-1.
    *
    * Disabled when: the committed board is already the seed (nothing to
-   * abandon), game is over, or hard mode is active (future feature —
-   * HARD_MODE constant placeholder for now).
+   * abandon), game is over, or hard mode is active (future HARD_MODE hook).
+   * Button-only — no keyboard shortcut, because it's a bigger commitment
+   * than Revert. Esc is reserved for Revert.
    */
   const HARD_MODE = false; // TODO: wire to a real setting once hard mode lands
-  const backToStart = () => {
+  const restartChain = () => {
     if (gameOver) return;
     if (HARD_MODE) return;
     if (history[history.length - 1].board.join('') === startSeed) return;
@@ -355,25 +343,6 @@ export function App() {
       `Back to ${startSeed}. Chain reset to ×1.0. Previous path stays blocked — find a new first move.`
     );
     setStatusTone('warning');
-  };
-
-  /**
-   * Revert any uncommitted edits, restoring the board to the last
-   * successfully-submitted state (or the seed, if no moves yet). Doesn't
-   * touch chain, score, history, or the timer — this is a pre-commit
-   * escape hatch for "I just clicked four things by accident on mobile,"
-   * not an undo-last-move.
-   */
-  const restoreBoard = () => {
-    if (gameOver) return;
-    const lastValid = history[history.length - 1].board;
-    if (countDiffs(lastValid, board) === 0) return;
-    setBoard(lastValid.slice());
-    setSelectedIdx(null);
-    setPendingHint(null);
-    setPendingRemoveSource(null);
-    setStatusMessage('Restored to the last committed board. Keep going.');
-    setStatusTone('info');
   };
 
   /**
@@ -476,7 +445,17 @@ export function App() {
       }
       if (e.key === 'Escape') {
         e.preventDefault();
-        restoreBoard();
+        revertToLastWord();
+        return;
+      }
+      if (e.key === '1') {
+        e.preventDefault();
+        restartChain();
+        return;
+      }
+      if (e.key === '=') {
+        e.preventDefault();
+        buyHint();
         return;
       }
       if (selectedIdx == null) return;
@@ -516,18 +495,28 @@ export function App() {
   // Hint button label (derived from state)
   // ------------------------------------------------------------------
 
-  const hintButtonLabel = (() => {
-    if (gameOver) return 'Buy a guess';
-    if (!timerStarted) return 'Buy a guess';
-    const w = currentWindow();
-    const left = hintsLeftInWindow();
-    if (left > 0) return `Buy a guess (min ${w})`;
-    if (w === 1) return 'Next hint at 1:00';
-    return 'No hints left';
-  })();
-
   const hintButtonDisabled =
     gameOver || (timerStarted && hintsLeftInWindow() <= 0);
+
+  /**
+   * Label for the Buy Guess key on the virtual keyboard. When a hint is
+   * available or the game hasn't started, reads "Buy Guess". When the
+   * minute-1 hint has been used and we're still in minute 1, shows the
+   * live countdown to when the minute-2 hint unlocks. When both hints are
+   * spent, reads "No hints".
+   */
+  const hintLabel = (() => {
+    if (gameOver) return 'Buy Guess';
+    if (!timerStarted) return 'Buy Guess';
+    if (hintsLeftInWindow() > 0) return 'Buy Guess';
+    if (currentWindow() === 1) {
+      const wait = Math.max(0, timeLeft - 60);
+      const m = Math.floor(wait / 60);
+      const s = wait % 60;
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+    return 'No hints';
+  })();
 
   // ------------------------------------------------------------------
   // Message tone → CSS color
@@ -611,29 +600,6 @@ export function App() {
         }}
       />
 
-      <Controls
-        onSubmit={attemptSubmit}
-        onRestore={restoreBoard}
-        restoreButtonDisabled={
-          gameOver || countDiffs(history[history.length - 1].board, board) === 0
-        }
-        onInsertSpace={insertSpace}
-        onRemoveLetter={removeLetter}
-        removeButtonDisabled={
-          gameOver || selectedIdx == null || board[selectedIdx] === SPACE
-        }
-        onBuyHint={buyHint}
-        onBackToStart={backToStart}
-        backToStartDisabled={
-          gameOver || HARD_MODE ||
-          history[history.length - 1].board.join('') === startSeed
-        }
-        onReset={resetGame}
-        hintButtonLabel={hintButtonLabel}
-        hintButtonDisabled={hintButtonDisabled}
-        gameOver={gameOver}
-      />
-
       <div
         style={{
           minHeight: '22px',
@@ -646,34 +612,39 @@ export function App() {
         {statusMessage}
       </div>
 
-      <div
-        style={{
-          background: 'rgba(0, 0, 0, 0.04)',
-          borderRadius: '6px',
-          padding: '10px 14px',
-          marginBottom: '1rem',
+      <VirtualKeyboard
+        onLetterKey={(letter) => {
+          if (gameOver || selectedIdx == null) return;
+          setPendingHint(null);
+          setPendingRemoveSource(null);
+          setBoard((prev) => {
+            const next = prev.slice();
+            next[selectedIdx] = letter;
+            return next;
+          });
         }}
-      >
-        <div
-          style={{
-            fontSize: '11px',
-            color: 'var(--gapplet-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            marginBottom: '6px',
-          }}
-        >
-          How to play
-        </div>
-        <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
-          Each move: swap a letter, toggle a space, or <strong>remove</strong> a letter
-          (the rest shifts left, a trailing space appears). The result must be a valid
-          5-letter word, a 4-letter word with a space at either end, or two valid words
-          split by an interior space. Rare letters score more. Each good move adds 0.2
-          to your chain; invalid moves or repeats reset it to ×1.0.{' '}
-          <strong>Buy a guess</strong>: one hint per minute of play, no stacking.
-        </div>
-      </div>
+        onEnter={attemptSubmit}
+        onBackspace={removeLetter}
+        onSpace={insertSpace}
+        onRestartChain={restartChain}
+        onRevert={revertToLastWord}
+        onBuyHint={buyHint}
+        letterKeyDisabled={gameOver || selectedIdx == null}
+        enterDisabled={gameOver}
+        backspaceDisabled={
+          gameOver || selectedIdx == null || board[selectedIdx] === SPACE
+        }
+        spaceDisabled={gameOver || selectedIdx == null}
+        restartChainDisabled={
+          gameOver || HARD_MODE ||
+          history[history.length - 1].board.join('') === startSeed
+        }
+        revertDisabled={
+          gameOver || countDiffs(history[history.length - 1].board, board) === 0
+        }
+        hintDisabled={hintButtonDisabled}
+        hintLabel={hintLabel}
+      />
 
       <div>
         <div
@@ -682,6 +653,7 @@ export function App() {
             color: 'var(--gapplet-muted)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
+            marginTop: '1rem',
             marginBottom: '6px',
           }}
         >
