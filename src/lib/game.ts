@@ -158,17 +158,46 @@ export function findNeighbors(board: readonly string[]): Neighbor[] {
 
 /**
  * Chain multiplier rules:
- * - Starts at 1.0 at the beginning of the game
- * - Advances by CHAIN_STEP (0.2) on each successful non-hint move
- * - Caps at CHAIN_CAP (5.0)
- * - Resets to 1.0 on invalid move, repeat state, or multi-cell change
+ * - Starts at 1.0 at the beginning of the game.
+ * - Advances by CHAIN_STEP (0.2) on each successful non-hint move.
+ * - DOUBLES when the player creates an interior space (index 1/2/3) — a
+ *   "star move" worth the signature 🟢 in the share string. Replaces the
+ *   +0.2 advance, doesn't stack with it.
+ * - No ceiling — chains can go arbitrarily high with stacked star moves.
+ *   The cap was removed 2026-04-22 to make the mechanic feel meaningful
+ *   at scale rather than bumping into a wall at ×5.0.
+ * - Resets to 1.0 on invalid move, repeat state, multi-cell change, or
+ *   Restart Chain.
  */
 export const CHAIN_START = 1.0;
 export const CHAIN_STEP = 0.2;
-export const CHAIN_CAP = 5.0;
 
 export function advanceChain(current: number): number {
-  return Math.min(current + CHAIN_STEP, CHAIN_CAP);
+  return current + CHAIN_STEP;
+}
+
+export function doubleChain(current: number): number {
+  return current * 2;
+}
+
+/**
+ * True iff this move transitioned a letter at an interior position
+ * (index 1, 2, or 3) into a space. That's the scoring trigger for the
+ * chain-doubling "star move." Edge spaces (index 0 or 4) and letter↔letter
+ * swaps don't count.
+ *
+ * The predicate is single-cell; a valid Gapplet move changes at most one
+ * cell's letter/space status (Remove moves are detected separately via
+ * the shift pattern and never create interior spaces by construction).
+ */
+export function createdInteriorSplit(
+  prev: readonly string[],
+  curr: readonly string[]
+): boolean {
+  for (const i of [1, 2, 3]) {
+    if (prev[i] !== SPACE && curr[i] === SPACE) return true;
+  }
+  return false;
 }
 
 /**

@@ -36,6 +36,8 @@ import {
   countDiffs,
   boardKey,
   advanceChain,
+  doubleChain,
+  createdInteriorSplit,
   scoreMove,
   scoreHintedMove,
   CHAIN_START,
@@ -233,12 +235,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (hintsByWindow[m.minuteUsed] >= 1) {
         return err(400, `move ${i}: hint budget exhausted for minute ${m.minuteUsed}`, i);
       }
+      // Defense-in-depth: hints must not create interior splits. The client
+      // hint filter should already exclude those — reject if it didn't.
+      if (createdInteriorSplit(board, m.board)) {
+        return err(400, `move ${i}: hinted moves cannot create interior space splits`, i);
+      }
       // Infer placed letter from the single-cell change (hints are always 1-cell).
       const placedChar = m.board[changedIdx!];
       earned = scoreHintedMove(m.board, chain, placedChar);
       newChain = chain; // hints don't advance chain
       hintsByWindow[m.minuteUsed]++;
       hintCount++;
+    } else if (createdInteriorSplit(board, m.board)) {
+      // Star move: interior space created — chain doubles, no cap.
+      newChain = doubleChain(chain);
+      earned = scoreMove(m.board, newChain);
     } else {
       newChain = advanceChain(chain);
       earned = scoreMove(m.board, newChain);

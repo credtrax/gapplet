@@ -13,6 +13,8 @@ import {
   countDiffs,
   boardKey,
   advanceChain,
+  doubleChain,
+  createdInteriorSplit,
   scoreMove,
   scoreHintedMove,
   CHAIN_START,
@@ -404,6 +406,15 @@ export function App() {
         `Hint used: ${v.words.join(' + ')} • board ${chain.toFixed(1)}× − ${placedVal} = +${earned} (chain held)`
       );
       setStatusTone('warning');
+    } else if (createdInteriorSplit(prev, board)) {
+      // Star move: interior space created (index 1/2/3). Chain doubles
+      // instead of advancing by +0.2.
+      newChain = doubleChain(chain);
+      earned = scoreMove(board, newChain);
+      setStatusMessage(
+        `★ Star move: ${v.words.join(' + ')} • chain doubled to ${newChain.toFixed(1)}× = +${earned}`
+      );
+      setStatusTone('success');
     } else {
       newChain = advanceChain(chain);
       earned = scoreMove(board, newChain);
@@ -566,12 +577,19 @@ export function App() {
     }
     const current = history[history.length - 1].board;
     const neighbors = findNeighbors(current);
-    const unseen = neighbors.filter((n) => !seenConfigs.has(boardKey(n.board)));
-    if (unseen.length === 0) {
-      setStatusMessage('No legal moves from this position! Try restructuring.');
+    // Hints may not create interior-space splits — those are star-move
+    // territory for the player to find. Prevents hint-farming an interior
+    // space (which would freeze chain but set up the board for a later
+    // non-hinted interior-split replay — closed off by task #22-era design).
+    const usable = neighbors.filter(
+      (n) => !seenConfigs.has(boardKey(n.board)) && !createdInteriorSplit(current, n.board)
+    );
+    if (usable.length === 0) {
+      setStatusMessage('No legal non-star moves from this position. Try restructuring.');
       setStatusTone('danger');
       return;
     }
+    const unseen = usable;
 
     // Consume the hint immediately so the player can't repeatedly ask for
     // different hints within the same window.
