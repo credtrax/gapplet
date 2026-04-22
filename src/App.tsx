@@ -846,6 +846,7 @@ export function App() {
           history={history}
           score={score}
           startSeed={startSeed}
+          seedDate={startSeedDate}
           submission={submission}
         />
       )}

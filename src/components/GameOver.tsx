@@ -1,5 +1,6 @@
 import { SPACE } from '../lib/letterValues';
 import type { HistoryEntry } from '../App';
+import { Leaderboard } from './Leaderboard';
 
 type SubmissionState =
   | { status: 'idle' }
@@ -14,6 +15,7 @@ type GameOverProps = {
   history: HistoryEntry[];
   score: number;
   startSeed: string;
+  seedDate: string;
   submission: SubmissionState;
 };
 
@@ -27,7 +29,7 @@ type GameOverProps = {
  * POST to the validate-score Edge Function for signed-in daily-mode
  * games; the card surfaces success / failure / skip states inline.
  */
-export function GameOver({ history, score, startSeed, submission }: GameOverProps) {
+export function GameOver({ history, score, startSeed, seedDate, submission }: GameOverProps) {
   const moves = history.length - 1;
   const hintedCount = history.filter((h) => h.hinted).length;
 
@@ -97,6 +99,13 @@ export function GameOver({ history, score, startSeed, submission }: GameOverProp
             </div>
           );
         })}
+      </div>
+      <div style={{ marginTop: '1.25rem' }}>
+        <Leaderboard
+          seedDate={seedDate}
+          isHardMode={false}
+          refreshKey={submission.status === 'succeeded' ? submission.gameId : 'pending'}
+        />
       </div>
     </div>
   );
