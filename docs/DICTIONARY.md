@@ -2,11 +2,11 @@
 
 ## Current state
 
-`src/lib/wordList.ts` embeds ~6,650 words as a plain string constant
-(`WORDS_TEXT`), hand-curated from the prototype's embedded string literal.
-It's enough for a playable game but has obvious gaps — common words will
-be missing, and players will run into validation failures that feel
-arbitrary ("QUARK isn't a word?!").
+`src/lib/wordList.ts` embeds ~13,607 words as a plain string constant
+(`WORDS_TEXT`), generated from the public-domain ENABLE word list filtered
+to 1–5 letter words. Regeneration recipe is below. The older ~6,650-word
+hand-curated list that web-Claude shipped had obvious gaps (PARKA, QUARK,
+common plurals) and has been replaced.
 
 ## The upgrade
 
@@ -20,25 +20,35 @@ free Scrabble-friendly dictionary. It's in the public domain.
 - GitHub mirror: https://github.com/dolph/dictionary (file: `enable.txt`)
 - Also available from Norvig's corpus collection
 
-To install:
+To (re)install / regenerate from scratch:
 
 ```bash
-curl -o /tmp/enable.txt https://raw.githubusercontent.com/dolph/dictionary/master/enable.txt
+curl -sSfL -o /tmp/enable.txt https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt
 # Filter to 1-5 letter words, uppercase, sorted, dedup — then emit wordList.ts
-python3 -c "
+python3 <<'PY'
 words = [w.strip().upper() for w in open('/tmp/enable.txt')]
-words = sorted({w for w in words if 1 <= len(w) <= 5 and w.isalpha()})
-body = '\n'.join(words)
+filtered = sorted({w for w in words if 1 <= len(w) <= 5 and w.isalpha()})
+body = '\n'.join(filtered)
 with open('src/lib/wordList.ts', 'w') as f:
-    f.write('/**\n * Gapplet dictionary. Regenerate with docs/DICTIONARY.md instructions.\n */\n')
-    f.write('export const WORDS_TEXT = \`\n' + body + '\n\`;\n')
-print(f'Wrote {len(words)} words to src/lib/wordList.ts')
-"
+    f.write('/**\n')
+    f.write(' * The Gapplet dictionary, embedded as a plain string.\n')
+    f.write(' */\n')
+    f.write('export const WORDS_TEXT = `\n' + body + '\n`;\n')
+print(f'Wrote {len(filtered)} words to src/lib/wordList.ts')
+PY
 ```
 
-Filtering to 1-5 letter words shrinks the file dramatically (most ENABLE
-entries are longer than 5 letters, which we can't use anyway). Expect
-roughly 8,000-10,000 useful words after filtering.
+Filtering to 1-5 letter words shrinks the list dramatically (most ENABLE
+entries are longer than 5 letters, which we can't use). Typical output:
+~13,600 words, ~76KB as a `.ts` string constant. ENABLE itself does not
+contain any 1-letter entries — the game's "A" and "I" rule is enforced
+by `isWord()` regardless.
+
+**Content note:** ENABLE is public-domain but hasn't been curated to
+remove slurs and other words that modern Scrabble dictionaries (TWL06+)
+exclude. For a public deploy, apply a content blocklist before shipping
+— see the open follow-up task. This is a pre-launch concern, not a
+local-dev concern.
 
 ### Option 2: TWL (Tournament Word List)
 
