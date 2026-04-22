@@ -9,7 +9,7 @@
  * changes; see docs/DICTIONARY.md.
  */
 
-import { ELIGIBLE_SEEDS } from './eligibleSeeds';
+import { ELIGIBLE_SEEDS } from './eligibleSeeds.ts';
 
 /**
  * Pick a random eligible seed. Used only for "practice mode" — daily

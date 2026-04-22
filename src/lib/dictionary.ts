@@ -13,7 +13,7 @@
  * ~170k words). See docs/DICTIONARY.md.
  */
 
-import { WORDS_TEXT } from './wordList';
+import { WORDS_TEXT } from './wordList.ts';
 
 let _dict: Set<string> | null = null;
 

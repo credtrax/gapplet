@@ -7,8 +7,8 @@
  * in the React components.
  */
 
-import { isWord } from './dictionary';
-import { LETTER_VALUES, SPACE, boardPoints } from './letterValues';
+import { isWord } from './dictionary.ts';
+import { LETTER_VALUES, SPACE, boardPoints } from './letterValues.ts';
 
 /**
  * A board is always exactly 5 cells. Each cell holds a single uppercase
