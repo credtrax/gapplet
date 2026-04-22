@@ -3,7 +3,7 @@ import { Board } from './components/Board';
 import { Stats } from './components/Stats';
 import { GameOver } from './components/GameOver';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
-import { pickSeed } from './lib/seeds';
+import { pickSeed, todaySeed } from './lib/seeds';
 import {
   validateBoard,
   findNeighbors,
@@ -58,9 +58,22 @@ type HintsByWindow = { 1: number; 2: number };
  */
 type MessageTone = 'info' | 'success' | 'warning' | 'danger' | null;
 
+/**
+ * Choose the initial seed for this game. Daily shared puzzle by default
+ * (same word for every player on a given UTC date). Practice mode, opted
+ * into via `?practice=1` in the URL, picks a random eligible seed instead
+ * — used for local dev and for players who want another go without
+ * posting to the leaderboard.
+ */
+function pickInitialSeed(): string {
+  if (typeof window === 'undefined') return todaySeed();
+  const isPractice = new URLSearchParams(window.location.search).has('practice');
+  return isPractice ? pickSeed() : todaySeed();
+}
+
 export function App() {
   // --- Core game state ---
-  const [board, setBoard] = useState<BoardType>(() => pickSeed().split(''));
+  const [board, setBoard] = useState<BoardType>(() => pickInitialSeed().split(''));
   const [startSeed] = useState<string>(() => board.join(''));
   const [score, setScore] = useState(0);
   const [chain, setChain] = useState(CHAIN_START);

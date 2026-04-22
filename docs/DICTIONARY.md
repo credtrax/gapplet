@@ -50,6 +50,30 @@ exclude. For a public deploy, apply a content blocklist before shipping
 — see the open follow-up task. This is a pre-launch concern, not a
 local-dev concern.
 
+### After regenerating wordList.ts: regenerate the seed pool too
+
+The daily-puzzle seed pool lives in `src/lib/eligibleSeeds.ts`, also
+pre-baked (not computed at runtime — matters for Edge Function cold
+starts). When `wordList.ts` changes, regenerate the seed pool via:
+
+```bash
+node scripts/generate_seeds.mjs
+```
+
+The script:
+1. Reads `src/lib/wordList.ts` for the dictionary
+2. Fetches/reads `popular.txt` from `dolph/dictionary` (curated common-
+   words subset, ~25k entries) — cached at `/tmp/popular.txt`
+3. Intersects ENABLE 5-letter words with the popular subset
+4. Keeps only words with ≥8 valid one-swap neighbors in ENABLE
+5. Writes `src/lib/eligibleSeeds.ts` with the sorted, deduped array
+
+Current output: ~1,251 seeds. That's ~3.4 years of unique daily puzzles
+at one seed per UTC day. Bump `MIN_NEIGHBORS` in the script to tighten
+toward recognizability; lower it toward variety. **Changing the pool
+re-rolls every past daily seed — lock in before any leaderboard goes
+live.**
+
 ### Option 2: TWL (Tournament Word List)
 
 Used in North American Scrabble tournaments. Slightly smaller than
