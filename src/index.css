@@ -13,8 +13,27 @@
   --gapplet-cell-empty: #f0eeea;
   --gapplet-accent: #3b82f6;      /* selected cell */
   --gapplet-hint: #f59e0b;         /* hint cell */
+  --gapplet-dirty: #facc15;        /* cell changed but not yet submitted */
   --gapplet-success: #059669;
   --gapplet-danger: #dc2626;
+}
+
+/*
+ * Pulsing yellow glow on cells that have uncommitted edits. Signals
+ * "you've proposed a change — press Enter to submit, or Restore to back out."
+ * Static glow for users who've opted out of motion.
+ */
+@keyframes gapplet-dirty-pulse {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(250, 204, 21, 0.55); }
+  50%      { box-shadow: 0 0 14px 3px rgba(250, 204, 21, 0.95); }
+}
+.gapplet-dirty-cell {
+  box-shadow: 0 0 8px 1px rgba(250, 204, 21, 0.75);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .gapplet-dirty-cell {
+    animation: gapplet-dirty-pulse 1.4s ease-in-out infinite;
+  }
 }
 
 body {

@@ -3,16 +3,24 @@ type StatsProps = {
   score: number;
   chain: number;
   timerStarted: boolean;
+  /**
+   * Count of one-swap neighbors of the last committed board that haven't
+   * been played yet. When provided, renders as a fourth "Paths" card. App
+   * passes this only in dev builds for now — candidate for post-launch
+   * "taunt mode."
+   */
+  neighborCount?: number;
 };
 
 /**
- * The three stat cards across the top of the game: Time, Score, Chain.
+ * Stat cards across the top of the game: Time, Score, Chain, and (dev-only
+ * for now) Paths.
  *
  * Before the clock starts, Time is shown in muted color to signal that
  * the game is waiting for the player. When under 10 seconds, Time turns
  * red as urgency cue.
  */
-export function Stats({ timeLeft, score, chain, timerStarted }: StatsProps) {
+export function Stats({ timeLeft, score, chain, timerStarted, neighborCount }: StatsProps) {
   const m = Math.floor(timeLeft / 60);
   const s = timeLeft % 60;
   const timeStr = `${m}:${s.toString().padStart(2, '0')}`;
@@ -29,6 +37,9 @@ export function Stats({ timeLeft, score, chain, timerStarted }: StatsProps) {
       <StatCard label="Time" value={timeStr} color={timeColor} />
       <StatCard label="Score" value={score.toString()} />
       <StatCard label="Chain" value={`×${chain.toFixed(1)}`} />
+      {neighborCount !== undefined && (
+        <StatCard label="Paths" value={neighborCount.toString()} />
+      )}
     </div>
   );
 }

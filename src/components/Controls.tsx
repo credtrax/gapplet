@@ -1,5 +1,7 @@
 type ControlsProps = {
   onSubmit: () => void;
+  onRestore: () => void;
+  restoreButtonDisabled: boolean;
   onInsertSpace: () => void;
   onRemoveLetter: () => void;
   removeButtonDisabled: boolean;
@@ -12,12 +14,14 @@ type ControlsProps = {
 };
 
 /**
- * The row of action buttons. The hint and remove buttons' disabled state
- * are passed in from App because they depend on game state (timer, current
- * cell contents) that App owns.
+ * The row of action buttons. The hint, remove, and restore buttons' disabled
+ * state are passed in from App because they depend on game state (timer,
+ * current cell contents, diff from last committed board) that App owns.
  */
 export function Controls({
   onSubmit,
+  onRestore,
+  restoreButtonDisabled,
   onInsertSpace,
   onRemoveLetter,
   removeButtonDisabled,
@@ -31,6 +35,13 @@ export function Controls({
     <div className="flex gap-2 flex-wrap mb-3">
       <button onClick={onSubmit} disabled={gameOver} style={{ flex: 2, minWidth: '160px' }}>
         Submit move (Enter)
+      </button>
+      <button
+        onClick={onRestore}
+        disabled={restoreButtonDisabled}
+        style={{ flex: 1, minWidth: '120px' }}
+      >
+        Restore (Esc)
       </button>
       <button onClick={onInsertSpace} disabled={gameOver} style={{ flex: 1, minWidth: '110px' }}>
         Insert space

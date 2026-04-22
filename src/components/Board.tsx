@@ -3,6 +3,8 @@ import { LETTER_VALUES, SPACE } from '../lib/letterValues';
 type BoardProps = {
   /** Current 5-cell board state */
   board: readonly string[];
+  /** Last successfully-submitted board; used to detect uncommitted edits */
+  lastCommittedBoard: readonly string[];
   /** Which cell is currently selected (null if none) */
   selectedIdx: number | null;
   /** If a hint is pending, this is the cell that was auto-filled */
@@ -17,14 +19,18 @@ type BoardProps = {
  * The 5-cell board. Stateless — all visual state comes from props.
  *
  * Each cell shows the letter (or a space glyph if empty) and the Scrabble
- * value in the bottom-right corner. The border style encodes four states:
- *   - hinted:   amber (the "Buy a guess" suggestion)
- *   - selected: blue (player clicked this cell)
- *   - idle:     dashed (game is ready but clock hasn't started)
- *   - normal:   thin gray
+ * value in the bottom-right corner. The border + glow style encode five states,
+ * priority high-to-low:
+ *   - hinted:   amber (the "Buy a guess" suggestion) — takes precedence even
+ *               though hinted cells are technically also dirty.
+ *   - dirty:    yellow + pulsing glow (change proposed, awaiting Enter).
+ *   - selected: blue (player clicked this cell, not yet changed).
+ *   - idle:     dashed (game is ready but clock hasn't started).
+ *   - normal:   thin gray.
  */
 export function Board({
   board,
+  lastCommittedBoard,
   selectedIdx,
   hintedIdx,
   idle,
@@ -41,10 +47,13 @@ export function Board({
         const isSpace = ch === SPACE;
         const isSelected = i === selectedIdx;
         const isHinted = i === hintedIdx;
+        const isDirty = !isHinted && board[i] !== lastCommittedBoard[i];
 
         let border = '0.5px solid var(--gapplet-border)';
         if (isHinted) {
           border = '2px solid var(--gapplet-hint)';
+        } else if (isDirty) {
+          border = '2px solid var(--gapplet-dirty)';
         } else if (isSelected) {
           border = '2px solid var(--gapplet-accent)';
         } else if (idle) {
@@ -58,6 +67,7 @@ export function Board({
             aria-label={isSpace ? `Cell ${i + 1}, empty` : `Cell ${i + 1}, letter ${ch}`}
             aria-selected={isSelected}
             onClick={() => onCellClick(i)}
+            className={isDirty ? 'gapplet-dirty-cell' : undefined}
             style={{
               height: '110px',
               border,

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Board } from './components/Board';
 import { Stats } from './components/Stats';
 import { Controls } from './components/Controls';
@@ -108,6 +108,19 @@ export function App() {
     const w = currentWindow();
     return hintsByWindow[w] > 0 ? 0 : 1;
   };
+
+  /**
+   * How many unused one-swap neighbors exist from the last committed board?
+   * Dev-only counter used for playtesting and potential future "taunt mode."
+   * Memoized on history + seenConfigs so it only recomputes after a move,
+   * not on every input event. ~135 dict lookups — sub-millisecond.
+   */
+  const unusedNeighborCount = useMemo(() => {
+    if (gameOver) return 0;
+    const current = history[history.length - 1].board;
+    const neighbors = findNeighbors(current);
+    return neighbors.filter((n) => !seenConfigs.has(boardKey(n.board))).length;
+  }, [history, seenConfigs, gameOver]);
 
   // ------------------------------------------------------------------
   // Timer
@@ -296,6 +309,25 @@ export function App() {
   };
 
   /**
+   * Revert any uncommitted edits, restoring the board to the last
+   * successfully-submitted state (or the seed, if no moves yet). Doesn't
+   * touch chain, score, history, or the timer — this is a pre-commit
+   * escape hatch for "I just clicked four things by accident on mobile,"
+   * not an undo-last-move.
+   */
+  const restoreBoard = () => {
+    if (gameOver) return;
+    const lastValid = history[history.length - 1].board;
+    if (countDiffs(lastValid, board) === 0) return;
+    setBoard(lastValid.slice());
+    setSelectedIdx(null);
+    setPendingHint(null);
+    setPendingRemoveSource(null);
+    setStatusMessage('Restored to the last committed board. Keep going.');
+    setStatusTone('info');
+  };
+
+  /**
    * Remove the letter at the selected cell and shift everything to the right
    * of it one position left, leaving a trailing space. E.g. HEARD with A
    * selected becomes HERD·. This changes multiple cells in the board array
@@ -391,6 +423,11 @@ export function App() {
       if (e.key === 'Backspace') {
         e.preventDefault();
         removeLetter();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        restoreBoard();
         return;
       }
       if (selectedIdx == null) return;
@@ -508,11 +545,13 @@ export function App() {
           score={score}
           chain={chain}
           timerStarted={timerStarted}
+          neighborCount={import.meta.env.DEV ? unusedNeighborCount : undefined}
         />
       </div>
 
       <Board
         board={board}
+        lastCommittedBoard={history[history.length - 1].board}
         selectedIdx={selectedIdx}
         hintedIdx={pendingHint?.changedIdx ?? null}
         idle={!timerStarted && !gameOver}
@@ -525,6 +564,10 @@ export function App() {
 
       <Controls
         onSubmit={attemptSubmit}
+        onRestore={restoreBoard}
+        restoreButtonDisabled={
+          gameOver || countDiffs(history[history.length - 1].board, board) === 0
+        }
         onInsertSpace={insertSpace}
         onRemoveLetter={removeLetter}
         removeButtonDisabled={
