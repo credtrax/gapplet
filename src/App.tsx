@@ -45,6 +45,12 @@ export type HistoryEntry = {
    * seenConfigs retain the previous path so it can't be re-walked.
    */
   restructured?: boolean;
+  /**
+   * Chain multiplier after this move was committed. Used by the GameOver
+   * full-chain display to show the rate at which each score was earned.
+   * Not sent to the Edge Function (server recomputes scoring).
+   */
+  chainAfter: number;
 };
 
 /**
@@ -112,6 +118,7 @@ export function App() {
       initial: true,
       hinted: false,
       minuteUsed: null,
+      chainAfter: CHAIN_START,
     },
   ]);
   const [seenConfigs, setSeenConfigs] = useState<Set<string>>(
@@ -456,6 +463,7 @@ export function App() {
         initial: false,
         hinted: wasHinted,
         minuteUsed: wasHinted ? currentWindow() : null,
+        chainAfter: newChain,
       },
     ]);
     setSelectedIdx(null);
@@ -532,6 +540,7 @@ export function App() {
         hinted: false,
         minuteUsed: null,
         restructured: true,
+        chainAfter: CHAIN_START,
       },
     ]);
     setSelectedIdx(null);

@@ -1,4 +1,5 @@
 import { SPACE } from '../lib/letterValues';
+import { createdInteriorSplit } from '../lib/game';
 import type { HistoryEntry } from '../App';
 import { Leaderboard } from './Leaderboard';
 import { ShareButton } from './ShareButton';
@@ -77,9 +78,14 @@ export function GameOver({ history, score, startSeed, seedDate, submission }: Ga
       <div style={{ fontSize: '13px', fontFamily: 'monospace', lineHeight: 1.9 }}>
         {history.map((h, i) => {
           const display = h.board.map((c) => (c === SPACE ? '·' : c)).join('');
+          // 🔗 for normal/chain-advancing rows (including the seed as the chain
+          // origin); ⛓️‍💥 (broken chain) for Restart Chain rows — visually
+          // encodes "your chain broke here."
+          const linkGlyph = h.restructured ? '⛓️‍💥' : '🔗';
           if (h.initial) {
             return (
               <div key={i}>
+                <span>{linkGlyph}</span>{' '}
                 <span style={{ color: 'var(--gapplet-muted)' }}>{i + 1}.</span>{' '}
                 <span style={{ fontWeight: 500 }}>{display}</span>{' '}
                 <span style={{ color: 'var(--gapplet-muted)' }}>(seed)</span>
@@ -89,13 +95,27 @@ export function GameOver({ history, score, startSeed, seedDate, submission }: Ga
           const prevDisplay = history[i - 1].board
             .map((c) => (c === SPACE ? '·' : c))
             .join('');
+          // Star move = interior-split creation that wasn't a hint or restart.
+          // (Hints are filtered to never create interior splits, and restart
+          // rows return to the seed which has no spaces — so these guards are
+          // belt-and-suspenders, but cheap.)
+          const isStar =
+            !h.hinted &&
+            !h.restructured &&
+            createdInteriorSplit(history[i - 1].board, h.board);
           return (
             <div key={i}>
+              <span>{linkGlyph}</span>{' '}
               <span style={{ color: 'var(--gapplet-muted)' }}>{i + 1}.</span>{' '}
               <span style={{ color: 'var(--gapplet-muted)' }}>{prevDisplay}</span>
               <span style={{ color: 'var(--gapplet-muted)' }}>{' → '}</span>
               <span style={{ fontWeight: 500 }}>{display}</span>{' '}
               <span style={{ color: 'var(--gapplet-success)' }}>+{h.points}</span>
+              {!h.restructured && (
+                <span style={{ color: 'var(--gapplet-muted)' }}>
+                  {' '}({isStar && <>⭐ </>}×{h.chainAfter.toFixed(1)})
+                </span>
+              )}
               {h.hinted && h.minuteUsed != null && (
                 <span style={{ color: 'var(--gapplet-hint)' }}>
                   {' '}
