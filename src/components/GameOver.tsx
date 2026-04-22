@@ -1,6 +1,7 @@
 import { SPACE } from '../lib/letterValues';
 import type { HistoryEntry } from '../App';
 import { Leaderboard } from './Leaderboard';
+import { ShareButton } from './ShareButton';
 
 type SubmissionState =
   | { status: 'idle' }
@@ -50,6 +51,17 @@ export function GameOver({ history, score, startSeed, seedDate, submission }: Ga
         Final score: {score} over {moves} moves ({hintedCount} hinted). Seed: {startSeed}.
       </div>
       <SubmissionBadge submission={submission} />
+      {submission.status === 'succeeded' && (
+        <div style={{ marginTop: '0.75rem' }}>
+          <ShareButton
+            history={history}
+            finalScore={submission.finalScore}
+            chainPeak={submission.chainPeak}
+            seedDate={seedDate}
+            hardMode={false}
+          />
+        </div>
+      )}
       <div style={{ height: '1rem' }} />
       <div
         style={{
