@@ -3,6 +3,7 @@ import { Board } from './components/Board';
 import { Stats } from './components/Stats';
 import { GameOver } from './components/GameOver';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
+import { AuthButton } from './components/AuthButton';
 import { pickSeed, todaySeed } from './lib/seeds';
 import {
   validateBoard,
@@ -591,13 +592,16 @@ export function App() {
             Seed: {startSeed}
           </div>
         </div>
-        <Stats
-          timeLeft={timeLeft}
-          score={score}
-          chain={chain}
-          timerStarted={timerStarted}
-          neighborCount={import.meta.env.DEV ? unusedNeighborCount : undefined}
-        />
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+          <Stats
+            timeLeft={timeLeft}
+            score={score}
+            chain={chain}
+            timerStarted={timerStarted}
+            neighborCount={import.meta.env.DEV ? unusedNeighborCount : undefined}
+          />
+          <AuthButton />
+        </div>
       </div>
 
       <Board
