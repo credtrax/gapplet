@@ -46,6 +46,11 @@ Letter values come straight from Scrabble (A=1, E=1, Q=10, Z=10) — see
 
 - **Clock** is 2:00 (120 seconds). Starts when the player first taps a
   board cell, not on page load. Reading the seed is free.
+- **Paths** (live count in the header stats): how many unused one-swap
+  neighbors you have from your current committed board. Watch it drop
+  as you play; it jumps when you commit an edge-space or interior-split
+  move that opens up a new region of the word graph. Hidden (muted) in
+  hard mode.
 - **One-cell-change-per-move** is strict; changing more than one cell
   invalidates (except Remove, below — handled as one logical move).
 - **Remove (⌫)**: selecting a letter cell and pressing Backspace (or the

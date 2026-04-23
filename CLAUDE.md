@@ -27,7 +27,9 @@ Share button emits a spoiler-free emoji timeline.
 
 **Canonical game rules** live in `memory/project_gaplet_rules.md`. Treat that
 as the spec. Don't re-derive rules from code comments — the memory file is
-explicitly maintained as the source of truth.
+explicitly maintained as the source of truth. Visible in-game stats include
+Time, Score, Chain, and **Paths** (live count of unused one-swap neighbors
+from the last committed board — hidden/muted in hard mode when that ships).
 
 ## Architecture at a glance
 

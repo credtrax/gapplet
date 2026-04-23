@@ -313,9 +313,10 @@ export function App() {
 
   /**
    * How many unused one-swap neighbors exist from the last committed board?
-   * Dev-only counter used for playtesting and potential future "taunt mode."
-   * Memoized on history + seenConfigs so it only recomputes after a move,
-   * not on every input event. ~135 dict lookups — sub-millisecond.
+   * Visible as the "Paths" stat card in normal mode; hidden behind a
+   * muted placeholder in hard mode (task #22). Memoized on history +
+   * seenConfigs so it only recomputes after a move, not on every input
+   * event. ~135 dict lookups — sub-millisecond.
    */
   const unusedNeighborCount = useMemo(() => {
     if (gameOver) return 0;
@@ -798,7 +799,8 @@ export function App() {
             score={score}
             chain={chain}
             timerStarted={timerStarted}
-            neighborCount={import.meta.env.DEV ? unusedNeighborCount : undefined}
+            neighborCount={unusedNeighborCount}
+            hardMode={false /* TODO: wire to real hard-mode setting (task #22) */}
           />
           <button
             onClick={() => setShowHowTo(true)}
