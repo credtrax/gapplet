@@ -52,17 +52,44 @@ export function GameOver({ history, score, startSeed, seedDate, submission }: Ga
         Final score: {score} over {moves} moves ({hintedCount} hinted). Seed: {startSeed}.
       </div>
       <SubmissionBadge submission={submission} />
-      {submission.status === 'succeeded' && (
-        <div style={{ marginTop: '0.75rem' }}>
-          <ShareButton
-            history={history}
-            finalScore={submission.finalScore}
-            chainPeak={submission.chainPeak}
-            seedDate={seedDate}
-            hardMode={false}
-          />
-        </div>
-      )}
+      {(() => {
+        // Show Share anytime the game ended with actual moves, regardless
+        // of whether we successfully posted to the leaderboard. The share
+        // text drives traffic back to the game; even a first-timer who
+        // isn't signed in should be able to brag. We gate out:
+        //   - practice mode: the seed_date shown wouldn't match today's
+        //     actual daily puzzle, so recipients would play a different
+        //     word and be confused
+        //   - submitting: brief in-flight state, wait for resolution
+        //   - idle + zero moves: nothing to share
+        const showShare =
+          history.length > 1 &&
+          submission.status !== 'submitting' &&
+          submission.status !== 'practice' &&
+          submission.status !== 'idle';
+        if (!showShare) return null;
+
+        // For signed-in submissions we prefer the server-returned numbers
+        // (authoritative). Otherwise we compute from the client's own view
+        // of the game — chain peak is the max chainAfter we recorded.
+        const displayScore =
+          submission.status === 'succeeded' ? submission.finalScore : score;
+        const displayPeak =
+          submission.status === 'succeeded'
+            ? submission.chainPeak
+            : Math.max(1, ...history.map((h) => h.chainAfter));
+        return (
+          <div style={{ marginTop: '0.75rem' }}>
+            <ShareButton
+              history={history}
+              finalScore={displayScore}
+              chainPeak={displayPeak}
+              seedDate={seedDate}
+              hardMode={false}
+            />
+          </div>
+        );
+      })()}
       <div style={{ height: '1rem' }} />
       <div
         style={{

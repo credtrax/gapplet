@@ -631,15 +631,30 @@ export function App() {
     setBoard(choice.board.slice());
     setSelectedIdx(choice.changedIdx);
 
-    const costLabel =
-      choice.placedChar === SPACE
-        ? 'space (0 pts)'
-        : `${choice.placedChar} (${LETTER_VALUES[choice.placedChar] ?? 0} pts)`;
-    setStatusMessage(
-      `Hint placed: ${choice.words.join(' + ')}. Press Enter to play — cost ${costLabel}, chain held.`
-    );
+    // Set a brief placeholder message; attemptSubmit fires via the
+    // auto-commit effect below and overwrites it with the real outcome
+    // within a render tick. Users never see this line in practice, but
+    // it prevents a flash of stale content if React re-renders before
+    // the effect runs.
+    setStatusMessage(`Playing hint: ${choice.words.join(' + ')}…`);
     setStatusTone('warning');
   };
+
+  // Auto-commit hinted moves: Buy Guess is an explicit paid action, so
+  // there's no second-confirmation value in requiring Enter after the
+  // board updates. When buyHint flips pendingHint to a Neighbor, fire
+  // attemptSubmit on the next render — by which point the board state
+  // reflects the placed hint and the closure sees the right values.
+  // attemptSubmit clears pendingHint as part of its cleanup; the effect
+  // re-fires but short-circuits via the `if (pendingHint)` guard.
+  useEffect(() => {
+    if (pendingHint) {
+      attemptSubmit();
+    }
+    // attemptSubmit is intentionally omitted from deps — we want this
+    // effect to fire only when pendingHint transitions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingHint]);
 
   // ------------------------------------------------------------------
   // Keyboard handler
