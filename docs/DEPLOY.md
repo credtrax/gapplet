@@ -29,12 +29,12 @@ Do these in order. The first several steps produce a working
 `*.vercel.app` URL; the domain cutover happens last so there's always a
 known-good fallback.
 
-### 1. Repo prep (Claude can do solo)
+### 1. Repo prep
 
-- [ ] Add a minimal `vercel.json` with SPA fallback so deep-linked routes
-      resolve to `index.html`. (Not strictly required today — the game is
-      single-route — but cheap insurance against future routing.)
-- [ ] Commit + push.
+No `vercel.json` needed today. Vercel's Vite preset is zero-config for
+SPAs, and Gapplet has no client-side router — every meaningful URL is
+`/` (with optional query params like `?practice=1`). If a real router
+gets added later, this is when to add `vercel.json` with an SPA rewrite.
 
 ### 2. Vercel project (Joe drives, dashboard)
 
