@@ -53,11 +53,39 @@ word games that reward pausing to think always devolve into anxiety.
 Chain parameters:
 
 - Start: ×1.0
-- Per-move advance: +0.2
-- Cap: ×5.0 (reachable after 20 good moves — theoretically possible in
-  2 minutes, practically very hard)
-- Reset: any invalid move, any multi-cell change, any repeated
-  configuration
+- Per-move advance: +0.2 on normal valid moves
+- **Star move (interior space created): doubles the chain** (see next
+  section)
+- **No cap** (removed 2026-04-22). Stacked star moves can push the chain
+  arbitrarily high; this keeps the mechanic rewarding all the way up.
+- Reset: any invalid move, any multi-cell change that isn't Remove, any
+  repeated configuration, or an explicit Restart Chain.
+
+## Star moves — interior-space doubling
+
+When a move creates a space at an interior position (index 1, 2, or 3 —
+any position other than the two edges), the chain multiplier **doubles**
+instead of advancing by the usual +0.2. Example: `ADMIT` with the `M`
+replaced by a space → `AD·IT` validates as two words (`AD` + `IT`) and
+the chain goes ×1.4 → ×2.8 in one move.
+
+Why this mechanic exists: interior splits require the player to
+simultaneously hold a valid word on either side of the space, which is
+meaningfully harder than a letter-for-letter swap. Without a dedicated
+reward, the effort isn't worth the risk. Star moves give the game a
+signature high-reward moment absent from Wordle and Scrabble alike.
+
+Why the cap was removed: with star moves capped at ×5.0, skilled players
+hit the ceiling quickly and the doubling stops mattering. Removing it
+makes the top end of the score distribution a real incentive to keep
+pushing.
+
+Hints are **filtered** to never create interior splits. Hint-suggested
+moves freeze the chain anyway (no doubling, no +0.2), but a hinted
+interior split would leave the player sitting on a fat multiplier
+setup without the effort of finding it. The filter closes that off at
+the hint selector; the Edge Function also rejects any hinted move whose
+delta matches an interior-split pattern (defense in depth).
 
 ## Chain breaks on repeated configuration, not repeated word
 
@@ -129,31 +157,63 @@ with ≥10 valid one-swap neighbors in the current dictionary. This
 protects against the "bad seed" experience without requiring manual
 curation — when the dictionary grows, more seeds qualify automatically.
 
+## Daily shared puzzle
+
+Every player globally plays the same seed on a given UTC date. This is
+the precondition for socially-meaningful sharing: "I got 847 on today's
+puzzle" only lands if the reader played the same puzzle.
+
+Implementation: FNV-1a 32-bit hash of the `YYYY-MM-DD` string, modulo
+the pre-baked `ELIGIBLE_SEEDS` array. Same function runs client and
+server — the isomorphic `src/lib/seeds.ts` ensures they agree on which
+seed belongs to which date. Deterministic, no DB lookup needed.
+
+Eligible-seed pool construction: ENABLE 5-letter words intersected with
+`popular.txt` (curated common-words subset), filtered to entries with
+≥8 valid one-swap neighbors. Current count: ~1,250 seeds (about 3.4
+years of unique dailies before collisions become frequent). Regenerated
+via `scripts/generate_seeds.mjs` whenever the dictionary changes.
+
+**Locked once public.** Changing pool composition (lowering the neighbor
+threshold, swapping dictionaries) re-rolls every past daily seed. That's
+fine pre-launch, destructive post-launch.
+
+## Why we added a backend (reversal of original decision)
+
+The original prototype was pure client-only. That decision got reversed
+once the design goal clarified to "daily shared puzzle with a global
+leaderboard" — because:
+
+- Leaderboards require persistent comparable data across players.
+  localStorage can't share, and a static GitHub-Action file can't accept
+  submissions.
+- Without server-side score validation, leaderboards are a cheat
+  magnet. The moment a public URL exists, someone opens DevTools and
+  submits `score: 999999`. The anti-cheat invariant (see CLAUDE.md)
+  requires server-side replay, which requires a server.
+- The stack chosen (Supabase) imposes very low maintenance overhead —
+  no infra to run, free tier is generous, auth is a turnkey feature.
+  The "I don't want to run a second SaaS" concern is preserved because
+  Supabase runs it.
+
+Practice mode (`?practice=1`) retains the original no-persistence model
+— games don't touch the DB. Preserves the "quick replay with no stakes"
+experience.
+
+## Mobile-first with an on-screen keyboard
+
+The game ships an on-screen QWERTY keyboard (3 rows of letters, Enter
++ letter cluster + ⌫ on row 3, Space on row 4) because mobile is the
+primary target platform. Physical keyboard still works in parallel on
+desktop.
+
+Timer rule: tapping a letter key on the on-screen keyboard does NOT
+start the clock. Only tapping one of the 5 board cells does. This
+preserves the "read the seed for free" UX even with the virtual
+keyboard always visible.
+
 ## No dark mode (yet)
 
-The prototype is light-themed. Dark mode is a reasonable addition but
-was deferred: getting the game mechanic right took priority, and dark
-mode is a pure theming task that can be bolted on later without any
-logic changes.
-
-## No mobile-specific UI (yet)
-
-The game works on mobile but relies on the physical keyboard for letter
-entry. An on-screen 26-key keyboard would be a significant addition —
-it needs layout logic, touch handling, and screen-real-estate tradeoffs.
-Deferred until the core game is polished enough to be worth the work.
-
-## No backend, ever (probably)
-
-Gapplet is intentionally client-only. No accounts, no server leaderboards,
-no telemetry. Reasons:
-
-- **Lower friction to share.** A static HTML page can be hosted anywhere
-  for free and linked freely.
-- **No maintenance burden.** Anthropic already runs one SaaS
-  (CredentialTrax); Joe doesn't need a second.
-- **Privacy.** No user data = no user data problems.
-
-If Gapplet ever needs persistent state (personal best, streak), use
-`localStorage`. If it ever needs daily global stats, use a static daily
-file generated from a GitHub Action — still no "real" backend.
+Deferred. CSS palette is already variables (`--gapplet-bg`, `--gapplet-fg`,
+etc.), so the work is essentially adding a `@media (prefers-color-scheme:
+dark)` block. Queued, not yet implemented.

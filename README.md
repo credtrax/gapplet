@@ -1,149 +1,181 @@
 # Gapplet
 
-A two-minute word-chain game. Start with a seed word, change one cell at a time,
-build the longest valid chain you can.
+A two-minute word-chain game. Daily shared puzzle. Swap one letter at a
+time, build the longest chain you can, and — if you're signed in — post
+your score to the global leaderboard.
+
+Play live at `gapplet.joecorn.com` *(deploy pending)*.
 
 ## Concept
 
-The board has **5 cells**. Each cell holds either a letter or a space (the "gap"
-in Gapplet). A board is valid when it reads left-to-right as any of:
+The board has **5 cells**. Each cell holds either a letter or a space
+(the "gap" in Gapplet). A board is valid when it reads left-to-right as
+any of:
 
 - One 5-letter word, no space: `HEART`
-- A 4-letter word with one edge space: ` CARS` or `CARS `
-- Two valid words split by one interior space: `A CATS` (1+3), `ON OF` (2+2),
-  `CAT A` (3+1)
+- A 4-letter word with one edge space: `·CARS` or `CARS·`
+- Two valid words split by one interior space: `A·CATS` (1+3),
+  `ON·OF` (2+2), `CAT·A` (3+1)
 
-Two or more spaces is never valid. Single-letter words are restricted to `A`
-and `I` — no `O`, no `K`, even though some Scrabble dictionaries include them.
+Two or more spaces is never valid. Single-letter "words" are restricted
+to `A` and `I` — no `O`, no `K`, even though some Scrabble dictionaries
+include them.
 
-Each turn the player **changes exactly one cell** — swaps a letter, turns a
-letter into a space, or turns a space into a letter. The result must validate
-per the rules above.
+Each turn the player **changes exactly one cell** — swaps a letter,
+turns a letter into a space, or turns a space into a letter. The result
+must validate per the rules above.
 
 ## Scoring
 
 Each valid move earns `round(boardPoints × chainMultiplier)`, where:
 
 - `boardPoints` = sum of Scrabble letter values on the board (spaces = 0)
-- `chainMultiplier` starts at 1.0, advances by 0.2 per successful non-hint move,
-  caps at 5.0
-- Invalid moves, repeated configurations, or multi-cell changes **reset chain to
-  1.0** but do not reduce score
+- `chainMultiplier` starts at 1.0 and **advances by +0.2** per normal
+  successful move.
+- **Star moves** (creating a space at the interior — position 2, 3, or
+  4) double the chain multiplier instead of advancing it. No cap.
+- Hinted moves hold the chain (no advance) and subtract the newly-placed
+  letter's Scrabble value from the earned points.
+- Invalid moves, repeated configurations, or multi-cell changes **reset
+  chain to 1.0** but do not reduce score.
 
-Scrabble letter values are used verbatim (A=1, E=1, Q=10, Z=10, etc.) — see
+Letter values come straight from Scrabble (A=1, E=1, Q=10, Z=10) — see
 `src/lib/letterValues.ts`.
 
-## Rules
+## Mechanics
 
-1. **Clock** is 2:00 (120 seconds). Clock starts when the player first
-   interacts with the board (click a cell or type a letter), not when the game
-   is dealt. This gives thinking time to read the seed.
-2. **One-cell-change-per-move** is strict. Changing more than one cell invalidates.
-3. **Repeated board configurations** break the chain (you can't cycle through
-   the same states to farm points).
-4. **Single-letter "words"** allowed only for `A` and `I`. Other single-letter
-   entries reject.
-5. **"Buy a guess"** hints: one per minute of play, no stacking. If unused in
-   minute 1, it does not carry over to minute 2. Hints cost the Scrabble value
-   of the newly-placed letter (subtracted from the move's earned points) and do
-   **not** advance the chain multiplier.
-6. **Seeds** are pre-filtered algorithmically: only seeds with ≥10 valid
-   one-swap neighbors in the dictionary are eligible. This avoids dead-end
-   seeds like QUICK that have almost no play surface.
+- **Clock** is 2:00 (120 seconds). Starts when the player first taps a
+  board cell, not on page load. Reading the seed is free.
+- **One-cell-change-per-move** is strict; changing more than one cell
+  invalidates (except Remove, below — handled as one logical move).
+- **Remove (⌫)**: selecting a letter cell and pressing Backspace (or the
+  ⌫ key on the on-screen keyboard) shifts everything right of it one
+  position left and appends a trailing space. E.g. `HEARD` with `A`
+  selected → `HERD·`.
+- **Restart Chain (the broken-chain button at the top of the keyboard):
+  returns the board to the seed word. Chain resets to ×1.0, but every
+  configuration you've already played stays blocked — you must find a
+  different first move. Two uses: escape a dead-end, or strategically
+  abandon a branch that isn't panning out.
+- **Revert (Esc)**: undo uncommitted edits only. Chain and score
+  unchanged. Pre-commit safety net.
+- **Buy a guess (hints)**: one per minute of play, no stacking. Hint
+  budget is window-based (minute-1 hint expires at 1:00 if unused).
+  Hints never create interior space splits — no hint-farming the star
+  mechanic.
+- **Repeated board configurations** break the chain. Can't cycle through
+  the same states to farm points.
 
-## End-game
+## Daily shared puzzle
 
-When the clock hits 0, a "Game over" panel shows:
+Every player globally plays the same seed on a given UTC date. The seed
+rotates at 00:00 UTC. Your first completed game of the day counts for
+the leaderboard. Replay for practice via `?practice=1` — practice games
+don't post.
 
-- Final score, total moves, number of hinted moves
-- The seed word
-- The complete chain — every move, the board state, the word(s) it formed, the
-  points earned, and `[hint • min N]` tags for hinted moves
+Pool size is ~1,250 seeds (~3.4 years of unique dailies). Generated from
+ENABLE 5-letter words intersected with the dolph/dictionary `popular.txt`
+subset, filtered to ≥8 one-swap neighbors. See `docs/DICTIONARY.md`.
 
-## Current status
+## End-of-game
 
-This is an **early MVP prototype**. It works end-to-end, but is missing several
-things that would make it genuinely viral:
+When the clock hits 0 or you run out of valid moves:
 
-- [ ] Larger dictionary (currently ~4,500 words; production target is ENABLE
-      or TWL at ~170,000 words). See `docs/DICTIONARY.md`.
-- [ ] Daily seed (same puzzle for everyone that day, UTC-based) — required for
-      the Wordle-style social-sharing hook
-- [ ] Share button that outputs a spoiler-free result string
-- [ ] Personal best / statistics persistence (localStorage)
-- [ ] Sound effects and subtle animations on successful moves
-- [ ] Mobile-friendly on-screen keyboard (currently relies on physical keyboard
-      for letter entry)
-- [ ] Proper test suite (Vitest)
-- [ ] Production build pipeline and deployment
+- **Submission badge** shows the server-verified score (if you're signed
+  in), or a prompt to sign in.
+- **Share button** copies a spoiler-free emoji timeline to the clipboard
+  (or opens the mobile native share sheet). The emoji cascade:
+  🟦 restart, 🟥 dead-end, 🟢 star move, 🟨 hint, 🟩 normal.
+- **Full chain** shows every committed move — previous → new board
+  transition, score, multiplier after the move, and a ⭐ marker on
+  star-move rows.
+- **Today's leaderboard** shows the top 20 and, if you're outside it,
+  your own row with its true rank.
 
 ## Stack
 
-- **Vite** for dev server and bundling
-- **React 18** + **TypeScript** for the UI
-- **Tailwind CSS v4** for styling
-- No backend, no database, no accounts. All state is client-side.
+- **Frontend:** Vite + React 18 + TypeScript + Tailwind CSS v4
+- **Backend:** Supabase — Auth (Google / GitHub / email magic link),
+  Postgres (`profiles` + `games` + leaderboard views),
+  Edge Functions (`validate-score`, Deno runtime)
+- **Planned hosting:** Vercel for the static frontend, Hostinger for DNS
+  (`gapplet.joecorn.com`)
 
-This mirrors the CredentialTrax frontend stack deliberately, so Joe's muscle
-memory applies.
+The `src/lib/*` module tree is intentionally isomorphic — the same files
+that run in the browser also import into the Edge Function so the server
+can replay move histories using identical scoring logic. That's the
+foundation of the anti-cheat model: clients can't write to the `games`
+table directly; only the Edge Function (running as `service_role`) can,
+and it only does so after a clean replay.
 
 ## Development
 
 ```bash
 npm install
-npm run dev      # starts on http://localhost:5173
-npm run build    # production bundle to dist/
-npm run preview  # serves the production build locally
+npm run dev      # http://localhost:5174
+npm run build
+npm run preview
+
+# Regenerate the seed pool after swapping the dictionary:
+node scripts/generate_seeds.mjs
+
+# Apply DB migrations:
+supabase db push
+
+# Deploy the Edge Function:
+supabase functions deploy validate-score
 ```
+
+You need `.env.local` with `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_PUBLISHABLE_KEY`. Template in `.env.example`.
 
 ## Project structure
 
 ```
 gapplet/
-├── README.md                    # this file
+├── README.md
+├── CLAUDE.md                          # AI-session onboarding
 ├── docs/
-│   ├── DESIGN.md                # design rationale and open questions
-│   ├── DICTIONARY.md            # notes on the dictionary problem
-│   └── ROADMAP.md               # prioritized next steps
+│   ├── DESIGN.md                      # rationale for non-obvious decisions
+│   ├── DICTIONARY.md                  # dictionary + seed-pool regeneration
+│   └── ROADMAP.md                     # current status + pointer to task list
+├── scripts/
+│   └── generate_seeds.mjs             # regenerates eligibleSeeds.ts
 ├── src/
-│   ├── main.tsx                 # entry point
-│   ├── App.tsx                  # game component (the whole UI)
-│   ├── index.css                # Tailwind imports + custom styles
-│   ├── lib/                    # isomorphic — runs in browser AND Deno (Edge Functions)
-│   │   ├── wordList.ts          # dictionary source, embedded as a string export
-│   │   ├── letterValues.ts      # Scrabble letter values
-│   │   ├── dictionary.ts        # lazy-init Set + isWord() over wordList
-│   │   ├── game.ts              # pure game logic (validate, neighbors, scoring)
-│   │   └── seeds.ts             # candidate seeds + neighbor-count filter (lazy)
+│   ├── main.tsx                       # entry, wraps App in <AuthProvider>
+│   ├── App.tsx                        # game orchestrator
+│   ├── index.css                      # Tailwind + palette CSS variables
+│   ├── lib/                           # isomorphic (browser + Deno Edge Function)
+│   │   ├── game.ts                    # validate, neighbors, scoring, chain
+│   │   ├── dictionary.ts              # isWord() over WORDS_TEXT
+│   │   ├── wordList.ts                # ENABLE 1-5 letter words (bundled string)
+│   │   ├── seeds.ts                   # pickSeed / pickSeedForDate / todaySeed
+│   │   ├── eligibleSeeds.ts           # pre-baked; regenerate via script
+│   │   ├── letterValues.ts            # Scrabble values + SPACE constant
+│   │   ├── supabase.ts                # browser-only: client singleton
+│   │   └── auth.tsx                   # browser-only: AuthProvider + useAuth
 │   └── components/
-│       ├── Board.tsx            # the 5-cell board
-│       ├── Stats.tsx            # time/score/chain cards
-│       ├── Controls.tsx         # submit/space/hint/reset buttons
-│       └── GameOver.tsx         # end-of-game summary
+│       ├── Board.tsx                  # 5-tile board
+│       ├── Stats.tsx                  # Time / Score / Chain / (dev) Paths
+│       ├── VirtualKeyboard.tsx        # on-screen mobile keyboard
+│       ├── GameOver.tsx               # end-of-game card
+│       ├── Leaderboard.tsx            # daily top-20 + overflow row
+│       ├── ShareButton.tsx            # spoiler-free emoji timeline
+│       ├── AuthButton.tsx             # header sign-in indicator
+│       ├── SignInModal.tsx            # provider picker
+│       └── HowToPlay.tsx              # 6-slide tutorial
+├── supabase/
+│   ├── config.toml                    # per-function verify_jwt overrides
+│   ├── migrations/                    # SQL migrations, timestamped
+│   └── functions/
+│       └── validate-score/
+│           └── index.ts               # Deno Edge Function
 ├── index.html
 ├── package.json
 ├── tsconfig.json
-├── vite.config.ts
-└── tailwind.config.js
+├── tsconfig.node.json
+└── vite.config.ts
 ```
 
-## Design philosophy
-
-The original prototype (in chat with Claude) went through 5 iterations before
-this handoff. Key decisions that should not be casually reversed:
-
-1. **Scrabble letter values**, not custom values. Users intuitively understand
-   the Scrabble scoring system; reinventing it creates friction.
-2. **Chain multiplier rewards flow**, not individual clever plays. This means
-   a long chain of simple words beats a single brilliant rare-letter play —
-   which is the right bias for a speed game.
-3. **Clock doesn't start until interaction.** Reading time is free; you're
-   being timed on *playing*, not *reading*.
-4. **Hint limit by time-window, not total-count.** "Two per game" would allow
-   burning both in minute 1; "one per minute, no stacking" forces strategic
-   timing.
-5. **The name.** "Gapplet" signals the defining mechanic (the space-as-playable-cell)
-   with the cozy `-le` suffix that fits the word-game genre (Wordle, Heardle,
-   Quordle).
-
-See `docs/DESIGN.md` for the full reasoning on each.
+See `docs/DESIGN.md` for the non-obvious decisions that are deliberate
+and shouldn't be casually reversed.
