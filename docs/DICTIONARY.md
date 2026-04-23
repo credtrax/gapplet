@@ -2,53 +2,65 @@
 
 ## Current state
 
-`src/lib/wordList.ts` embeds ~13,607 words as a plain string constant
+`src/lib/wordList.ts` embeds ~13,553 words as a plain string constant
 (`WORDS_TEXT`), generated from the public-domain ENABLE word list filtered
-to 1–5 letter words. Regeneration recipe is below. The older ~6,650-word
-hand-curated list that web-Claude shipped had obvious gaps (PARKA, QUARK,
-common plurals) and has been replaced.
+to 1–5 letter words and passed through a slur/obscenity blocklist.
 
-## The upgrade
+## Regeneration
 
-Regenerate `src/lib/wordList.ts` from a proper dictionary. Options:
-
-### Option 1: ENABLE (recommended)
-
-The **ENABLE2K** word list contains ~173,000 words and is the de-facto
-free Scrabble-friendly dictionary. It's in the public domain.
-
-- GitHub mirror: https://github.com/dolph/dictionary (file: `enable.txt`)
-- Also available from Norvig's corpus collection
-
-To (re)install / regenerate from scratch:
+Two scripts, run in order:
 
 ```bash
-curl -sSfL -o /tmp/enable.txt https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt
-# Filter to 1-5 letter words, uppercase, sorted, dedup — then emit wordList.ts
-python3 <<'PY'
-words = [w.strip().upper() for w in open('/tmp/enable.txt')]
-filtered = sorted({w for w in words if 1 <= len(w) <= 5 and w.isalpha()})
-body = '\n'.join(filtered)
-with open('src/lib/wordList.ts', 'w') as f:
-    f.write('/**\n')
-    f.write(' * The Gapplet dictionary, embedded as a plain string.\n')
-    f.write(' */\n')
-    f.write('export const WORDS_TEXT = `\n' + body + '\n`;\n')
-print(f'Wrote {len(filtered)} words to src/lib/wordList.ts')
-PY
+node scripts/generate_wordlist.mjs    # ENABLE → filter → wordList.ts
+node scripts/generate_seeds.mjs       # wordList.ts → eligibleSeeds.ts
 ```
 
-Filtering to 1-5 letter words shrinks the list dramatically (most ENABLE
-entries are longer than 5 letters, which we can't use). Typical output:
-~13,600 words, ~76KB as a `.ts` string constant. ENABLE itself does not
-contain any 1-letter entries — the game's "A" and "I" rule is enforced
-by `isWord()` regardless.
+`generate_wordlist.mjs`:
+1. Fetches ENABLE from `dolph/dictionary` (cached at `/tmp/enable.txt`)
+2. Filters to 1–5 letter uppercase-alpha words
+3. Applies the blocklist at `scripts/blocklist.txt`
+4. Writes `src/lib/wordList.ts`
 
-**Content note:** ENABLE is public-domain but hasn't been curated to
-remove slurs and other words that modern Scrabble dictionaries (TWL06+)
-exclude. For a public deploy, apply a content blocklist before shipping
-— see the open follow-up task. This is a pre-launch concern, not a
-local-dev concern.
+Typical output: ~13,553 words, ~76KB as a `.ts` string constant.
+
+ENABLE does not contain any 1-letter entries — the game's "A" and "I"
+rule is enforced by `isWord()` regardless of what the dictionary holds.
+
+### About the source (ENABLE)
+
+The **ENABLE2K** word list contains ~173,000 words and is the de-facto
+free Scrabble-friendly dictionary. Public domain.
+
+- GitHub mirror: https://github.com/dolph/dictionary (file: `enable1.txt`)
+- Also available from Norvig's corpus collection
+
+### About the blocklist
+
+`scripts/blocklist.txt` is a copy of the English list from
+[LDNOOBW](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words) —
+a community-maintained list of slurs and obscene terms. At ENABLE ∩
+1–5 letters, the blocklist's effective size is ~54 exact matches
+(well-known slurs plus common sexual/vulgar vocabulary). See the
+generator's console output for the live list when you regenerate.
+
+**Why both dictionary AND seed filtering matter:** the dictionary filter
+means players can't play a blocked word as a move (server-side replay
+would reject it). The seed filter is derivative — since the seed pool
+is computed from the filtered dictionary, blocked words are automatically
+excluded as possible daily puzzles too. The anti-cheat invariant
+(server validates every move) means the blocklist is enforced on both
+client and server without extra work.
+
+**To allow a specific blocked word back in:** edit `scripts/blocklist.txt`
+and remove the line for that word, then rerun both regeneration scripts
+and redeploy the Edge Function (`supabase functions deploy validate-score`)
+since it bundles `wordList.ts`.
+
+**⚠️ Changing the blocklist or the source dictionary rerolls every past
+daily seed** (FNV-1a hash modulo the new pool size). Lock composition
+before public launch; after that, only add to the blocklist in response
+to real complaints, accept the small seed-rotation consequence, or keep
+a static override list for specific corrections.
 
 ### After regenerating wordList.ts: regenerate the seed pool too
 
