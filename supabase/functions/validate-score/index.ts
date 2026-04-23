@@ -86,7 +86,10 @@ function err(status: number, reason: string, failed_at_move?: number): Response 
 function detectRemoveIdx(prev: Board, curr: Board): number | null {
   if (curr[4] !== SPACE) return null;
   for (let k = 0; k < 5; k++) {
-    if (prev[k] === SPACE) continue;
+    // prev[k] can be either a letter or the interior space itself —
+    // collapsing a middle-space gap (BA·BY → BABY·) is a legal Remove
+    // action per task #29. The shift pattern (prefix preserved, suffix
+    // shifted left, trailing space) is still enforced below.
     let match = true;
     for (let i = 0; i < k && match; i++) {
       if (prev[i] !== curr[i]) match = false;

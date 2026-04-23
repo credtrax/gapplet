@@ -563,17 +563,23 @@ export function App() {
   const removeLetter = () => {
     if (gameOver) return;
     if (selectedIdx == null) {
-      setStatusMessage('Click a letter cell first, then press Remove to shift the board left.');
+      setStatusMessage('Click a cell first, then press Remove to shift the board left.');
       setStatusTone('danger');
       return;
     }
-    if (board[selectedIdx] === SPACE) {
-      setStatusMessage('Nothing to remove at that cell — it is already a space.');
+    // The only no-op Remove: trailing space at idx 4. Shift would
+    // reproduce the same board, then attemptSubmit would fail the
+    // seen-configs check with a misleading "already played" message.
+    // Catch it here with a clearer hint.
+    if (selectedIdx === 4 && board[4] === SPACE) {
+      setStatusMessage("That's already the trailing space — nothing would shift.");
       setStatusTone('danger');
       return;
     }
     maybeStartClock();
     const removedChar = board[selectedIdx];
+    const action =
+      removedChar === SPACE ? 'Gap closed' : `Removed "${removedChar}"`;
     setPendingHint(null);
     setBoard((prev) => [
       ...prev.slice(0, selectedIdx),
@@ -583,7 +589,7 @@ export function App() {
     setPendingRemoveSource(selectedIdx);
     setSelectedIdx(null);
     setStatusMessage(
-      `Removed "${removedChar}" — letters shifted, trailing space added. Press Enter to submit.`
+      `${action} — letters shifted, trailing space added. Press Enter to submit.`
     );
     setStatusTone(null);
   };
@@ -877,9 +883,7 @@ export function App() {
         onBuyHint={buyHint}
         letterKeyDisabled={gameOver || selectedIdx == null}
         enterDisabled={gameOver}
-        backspaceDisabled={
-          gameOver || selectedIdx == null || board[selectedIdx] === SPACE
-        }
+        backspaceDisabled={gameOver || selectedIdx == null}
         spaceDisabled={gameOver || selectedIdx == null}
         restartChainDisabled={
           gameOver || HARD_MODE ||
