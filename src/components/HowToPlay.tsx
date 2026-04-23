@@ -310,23 +310,33 @@ function MiniBoard({
         {cells.map((c, i) => {
           const isSpace = c === ' ';
           const isHi = i === highlight;
+          const classes = ['gapplet-tile'];
+          if (isSpace) classes.push('gapplet-tile--empty');
           return (
             <div
               key={i}
+              className={classes.join(' ')}
+              data-state={isHi ? 'hinted' : undefined}
               style={{
-                width: '24px',
-                height: '32px',
-                borderRadius: '3px',
+                width: '26px',
+                height: '34px',
+                borderRadius: '4px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '15px',
-                fontWeight: 500,
-                background: isSpace ? 'var(--gapplet-cell-empty)' : 'var(--gapplet-cell-bg)',
-                border: isHi
-                  ? '1.5px solid var(--gapplet-dirty)'
-                  : '0.5px solid var(--gapplet-border)',
-                color: isSpace ? 'var(--gapplet-muted)' : 'var(--gapplet-fg)',
+                fontSize: '16px',
+                fontWeight: 700,
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                color: isSpace ? 'var(--gapplet-muted)' : 'var(--gapplet-tile-fg)',
+                // Override the tile's dirty-hinted styles for the "highlight"
+                // cell in tutorial visuals; we want a dirty-yellow ring to
+                // signal "this cell changed" in the before/after pair.
+                ...(isHi
+                  ? {
+                      boxShadow:
+                        '0 0 0 2px var(--gapplet-dirty), 0 2px 4px var(--gapplet-tile-drop), inset 0 1px 0 var(--gapplet-tile-highlight), inset 0 -1px 0 var(--gapplet-tile-bevel)',
+                    }
+                  : null),
               }}
             >
               {isSpace ? '␣' : c}

@@ -49,16 +49,18 @@ export function Board({
         const isHinted = i === hintedIdx;
         const isDirty = !isHinted && board[i] !== lastCommittedBoard[i];
 
-        let border = '0.5px solid var(--gapplet-border)';
-        if (isHinted) {
-          border = '2px solid var(--gapplet-hint)';
-        } else if (isDirty) {
-          border = '2px solid var(--gapplet-dirty)';
-        } else if (isSelected) {
-          border = '2px solid var(--gapplet-accent)';
-        } else if (idle) {
-          border = '1px dashed var(--gapplet-border)';
-        }
+        // Priority order: hinted > dirty > selected > idle > (none).
+        // Dirty uses the pulse class; others use data-state for a
+        // static ring. Empty cells use the recessed variant.
+        const classes = ['gapplet-tile'];
+        if (isSpace) classes.push('gapplet-tile--empty');
+        if (isDirty) classes.push('gapplet-dirty-cell');
+
+        let stateAttr: string | undefined;
+        if (isHinted) stateAttr = 'hinted';
+        else if (isDirty) stateAttr = undefined; // pulse class handles ring
+        else if (isSelected) stateAttr = 'selected';
+        else if (idle) stateAttr = 'idle';
 
         return (
           <button
@@ -67,14 +69,14 @@ export function Board({
             aria-label={isSpace ? `Cell ${i + 1}, empty` : `Cell ${i + 1}, letter ${ch}`}
             aria-selected={isSelected}
             onClick={() => onCellClick(i)}
-            className={isDirty ? 'gapplet-dirty-cell' : undefined}
+            className={classes.join(' ')}
+            data-state={stateAttr}
             style={{
               height: '110px',
-              border,
-              borderRadius: '6px',
-              background: isSpace ? 'var(--gapplet-cell-empty)' : 'var(--gapplet-cell-bg)',
-              fontSize: '40px',
-              fontWeight: 500,
+              borderRadius: '8px',
+              fontSize: '42px',
+              fontWeight: 700,
+              fontFamily: 'Georgia, "Times New Roman", serif',
               position: 'relative',
               cursor: 'pointer',
               userSelect: 'none',
@@ -82,18 +84,20 @@ export function Board({
             }}
           >
             {isSpace ? (
-              <span style={{ fontSize: '28px', color: 'var(--gapplet-muted)' }}>␣</span>
+              <span style={{ fontSize: '30px', color: 'var(--gapplet-muted)', fontFamily: 'inherit' }}>␣</span>
             ) : (
               <>
                 <span>{ch}</span>
                 <span
                   style={{
                     position: 'absolute',
-                    bottom: '4px',
-                    right: '6px',
-                    fontSize: '11px',
-                    color: 'var(--gapplet-muted)',
-                    fontWeight: 400,
+                    bottom: '5px',
+                    right: '7px',
+                    fontSize: '13px',
+                    color: 'var(--gapplet-tile-fg)',
+                    fontWeight: 600,
+                    fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+                    opacity: 0.7,
                   }}
                 >
                   {LETTER_VALUES[ch] ?? 0}

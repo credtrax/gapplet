@@ -9,26 +9,121 @@
   --gapplet-fg: #1a1a1a;
   --gapplet-muted: #6b6b6b;
   --gapplet-border: #d4d4d0;
-  --gapplet-cell-bg: #ffffff;
-  --gapplet-cell-empty: #f0eeea;
-  --gapplet-accent: #3b82f6;      /* selected cell */
+  --gapplet-cell-bg: #ffffff;      /* LEGACY: kept for tutorial / chart fallbacks */
+  --gapplet-cell-empty: #f0eeea;   /* LEGACY */
+  --gapplet-accent: #3b82f6;       /* selected cell */
   --gapplet-hint: #f59e0b;         /* hint cell */
   --gapplet-dirty: #facc15;        /* cell changed but not yet submitted */
   --gapplet-success: #059669;
   --gapplet-danger: #dc2626;
+
+  /* Scrabble-inspired tile palette (task #19).
+   * Cream is distinct from Scrabble's exact trade dress (Hasbro's is more
+   * saturated). Dark-mode will override these without touching Board.tsx. */
+  --gapplet-tile-bg: #f5e7c5;      /* warm cream, letter tiles */
+  --gapplet-tile-bg-empty: #d9cdb4; /* darker beige, empty/space slots */
+  --gapplet-tile-fg: #2a2522;      /* near-black with a warm tilt */
+  --gapplet-tile-highlight: rgba(255, 255, 255, 0.55);  /* top inner edge */
+  --gapplet-tile-bevel: rgba(0, 0, 0, 0.12);             /* bottom inner edge */
+  --gapplet-tile-drop: rgba(0, 0, 0, 0.18);              /* below-tile shadow */
+  --gapplet-tile-inset: rgba(0, 0, 0, 0.22);             /* empty-slot recess */
 }
 
-/*
- * Pulsing yellow glow on cells that have uncommitted edits. Signals
- * "you've proposed a change — press Enter to submit, or Restore to back out."
- * Static glow for users who've opted out of motion.
- */
+/* ----------------------------------------------------------------------
+ * Tile styles — Scrabble-inspired but deliberately distinct.
+ *
+ * Raised letter tile: outer drop shadow + top inner highlight + bottom
+ * inner bevel creates a subtle 3D "wood tile" feel without images.
+ * Recessed empty slot: inset shadow makes it read as a socket the tile
+ * was lifted from.
+ *
+ * State rings (selected / hinted) layer as 0-offset box-shadows on top
+ * of the base tile shadows, so the ring hugs the tile edge without
+ * replacing the depth effect. Dirty pulse animates its ring.
+ * -------------------------------------------------------------------- */
+
+.gapplet-tile {
+  background: var(--gapplet-tile-bg);
+  color: var(--gapplet-tile-fg);
+  border: none;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),                /* thin edge line */
+    0 2px 5px var(--gapplet-tile-drop),           /* outer drop shadow */
+    inset 0 1.5px 0 var(--gapplet-tile-highlight),/* top inner highlight */
+    inset 0 -2px 0 var(--gapplet-tile-bevel);     /* bottom inner bevel */
+}
+.gapplet-tile--empty {
+  background: var(--gapplet-tile-bg-empty);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    inset 0 2px 4px var(--gapplet-tile-inset),    /* recessed top */
+    inset 0 -1px 0 rgba(255, 255, 255, 0.3);      /* faint bottom rim */
+}
+
+/* Override the default button:hover background — we don't want tiles to
+ * flash gray on cursor hover. Press-down (button:active scale) is fine. */
+.gapplet-tile:hover:not(:disabled) {
+  background: var(--gapplet-tile-bg);
+  border-color: transparent;
+}
+.gapplet-tile--empty:hover:not(:disabled) {
+  background: var(--gapplet-tile-bg-empty);
+}
+
+/* State rings — added as extra box-shadow layers via data-state. */
+.gapplet-tile[data-state='selected'] {
+  box-shadow:
+    0 0 0 2.5px var(--gapplet-accent),
+    0 2px 5px var(--gapplet-tile-drop),
+    inset 0 1.5px 0 var(--gapplet-tile-highlight),
+    inset 0 -2px 0 var(--gapplet-tile-bevel);
+}
+.gapplet-tile[data-state='hinted'] {
+  box-shadow:
+    0 0 0 2.5px var(--gapplet-hint),
+    0 2px 5px var(--gapplet-tile-drop),
+    inset 0 1.5px 0 var(--gapplet-tile-highlight),
+    inset 0 -2px 0 var(--gapplet-tile-bevel);
+}
+.gapplet-tile[data-state='idle'] {
+  box-shadow:
+    0 0 0 1px var(--gapplet-border),
+    inset 0 1.5px 0 var(--gapplet-tile-highlight),
+    inset 0 -2px 0 var(--gapplet-tile-bevel);
+  /* Dashed effect we lose with pure shadows — accept a static flat ring. */
+}
+
+/* ----------------------------------------------------------------------
+ * Dirty-cell pulse — yellow ring that throbs to signal uncommitted edits.
+ * Box-shadow stack includes the base tile shadows so the tile stays
+ * raised while the ring pulses.
+ * -------------------------------------------------------------------- */
 @keyframes gapplet-dirty-pulse {
-  0%, 100% { box-shadow: 0 0 4px 0 rgba(250, 204, 21, 0.55); }
-  50%      { box-shadow: 0 0 14px 3px rgba(250, 204, 21, 0.95); }
+  0%, 100% {
+    box-shadow:
+      0 0 0 2.5px var(--gapplet-dirty),
+      0 0 4px 0 rgba(250, 204, 21, 0.55),
+      0 2px 5px var(--gapplet-tile-drop),
+      inset 0 1.5px 0 var(--gapplet-tile-highlight),
+      inset 0 -2px 0 var(--gapplet-tile-bevel);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2.5px var(--gapplet-dirty),
+      0 0 16px 3px rgba(250, 204, 21, 0.95),
+      0 2px 5px var(--gapplet-tile-drop),
+      inset 0 1.5px 0 var(--gapplet-tile-highlight),
+      inset 0 -2px 0 var(--gapplet-tile-bevel);
+  }
 }
 .gapplet-dirty-cell {
-  box-shadow: 0 0 8px 1px rgba(250, 204, 21, 0.75);
+  /* Static fallback for reduced-motion; overrides the base tile shadow. */
+  box-shadow:
+    0 0 0 2.5px var(--gapplet-dirty),
+    0 0 8px 1px rgba(250, 204, 21, 0.75),
+    0 2px 5px var(--gapplet-tile-drop),
+    inset 0 1.5px 0 var(--gapplet-tile-highlight),
+    inset 0 -2px 0 var(--gapplet-tile-bevel);
 }
 @media (prefers-reduced-motion: no-preference) {
   .gapplet-dirty-cell {
