@@ -70,6 +70,11 @@ const POINTS_PER_HINT = 100;
 /** Seconds of inactivity before the Eliminate tool unlocks. */
 const ELIMINATE_IDLE_SECONDS = 10;
 
+/** Moves scoring at least this many points award a clock bonus. */
+const TIME_BONUS_THRESHOLD = 12;
+/** Seconds added to the clock for each qualifying move. */
+const TIME_BONUS_SECONDS = 2;
+
 export function App() {
   // --- Core game state ---
   const [{ seed: startSeed, seedDate: startSeedDate, isPractice: isPracticeMode }] =
@@ -382,31 +387,37 @@ export function App() {
 
     let earned: number;
     let newChain: number;
+    let messageBase: string;
+    let tone: MessageTone;
 
     if (opts?.hint) {
       // Hinted: chain held, board scored normally at the held multiplier.
       // The "cost" is one charge, paid out of the meter (handled in buyHint).
       earned = scoreMove(nextBoard, chain);
       newChain = chain;
-      setStatusMessage(
-        `Hint used: ${v.words.join(' + ')} • ${chain.toFixed(1)}× = +${earned} (chain held)`
-      );
-      setStatusTone('warning');
+      messageBase = `Hint used: ${v.words.join(' + ')} • ${chain.toFixed(1)}× = +${earned} (chain held)`;
+      tone = 'warning';
     } else if (createdInteriorSplit(prev, nextBoard)) {
       newChain = doubleChain(chain);
       earned = scoreMove(nextBoard, newChain);
-      setStatusMessage(
-        `★ Star move: ${v.words.join(' + ')} • chain doubled to ${newChain.toFixed(1)}× = +${earned}`
-      );
-      setStatusTone('success');
+      messageBase = `★ Star move: ${v.words.join(' + ')} • chain doubled to ${newChain.toFixed(1)}× = +${earned}`;
+      tone = 'success';
     } else {
       newChain = advanceChain(chain);
       earned = scoreMove(nextBoard, newChain);
-      setStatusMessage(
-        `Good: ${v.words.join(' + ')} • ${newChain.toFixed(1)}× = +${earned}`
-      );
-      setStatusTone('success');
+      messageBase = `Good: ${v.words.join(' + ')} • ${newChain.toFixed(1)}× = +${earned}`;
+      tone = 'success';
     }
+
+    // High-scoring moves award a clock bonus. The threshold is post-multiplier,
+    // so big chain runs make the bonus near-automatic — that's the point: a
+    // positive feedback loop where good play extends the runway.
+    const timeBonus = earned >= TIME_BONUS_THRESHOLD ? TIME_BONUS_SECONDS : 0;
+    if (timeBonus > 0) {
+      setTimeLeft((t) => t + timeBonus);
+    }
+    setStatusMessage(timeBonus > 0 ? `${messageBase}  +${timeBonus}s!` : messageBase);
+    setStatusTone(tone);
 
     setScore((s) => s + earned);
     setChain(newChain);
