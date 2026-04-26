@@ -3,7 +3,7 @@ import { Board } from './components/Board';
 import { Stats } from './components/Stats';
 import { GameOver } from './components/GameOver';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
-import { AuthButton } from './components/AuthButton';
+import { HamburgerMenu } from './components/HamburgerMenu';
 import { HowToPlay } from './components/HowToPlay';
 import { pickSeed, pickSeedForDate, utcDateString } from './lib/seeds';
 import { useAuth } from './lib/auth';
@@ -768,7 +768,7 @@ export function App() {
             >
               ?
             </button>
-            <AuthButton />
+            <HamburgerMenu />
           </div>
         </div>
 
