@@ -86,9 +86,9 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    label: 'Good +14 (with +0:02)',
+    label: 'Good +14 (no bonus)',
     category: 'Successful moves',
-    msg: 'Good: RAGED • 1.4× = +14  +0:02!',
+    msg: 'Good: RAGED • 1.4× = +14',
     tone: 'success',
     isReady: false,
     event: {
@@ -96,6 +96,21 @@ const SCENARIOS: Scenario[] = [
       isStar: false,
       isHint: false,
       multiplier: 1.4,
+      timeBonus: 0,
+      chargeEarned: false,
+    },
+  },
+  {
+    label: 'Good +15 (with +0:02)',
+    category: 'Successful moves',
+    msg: 'Good: BAKED • 1.5× = +15  +0:02!',
+    tone: 'success',
+    isReady: false,
+    event: {
+      earned: 15,
+      isStar: false,
+      isHint: false,
+      multiplier: 1.5,
       timeBonus: 2,
       chargeEarned: false,
     },
