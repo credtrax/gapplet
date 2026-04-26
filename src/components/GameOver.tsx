@@ -19,6 +19,9 @@ type GameOverProps = {
   startSeed: string;
   seedDate: string;
   submission: SubmissionState;
+  /** Number of blocklisted-word attempts during the game; passed through
+   * for the share-emit follow-up commit. Not yet rendered. */
+  soapPenalties: number;
 };
 
 /**
@@ -31,7 +34,7 @@ type GameOverProps = {
  * POST to the validate-score Edge Function for signed-in daily-mode
  * games; the card surfaces success / failure / skip states inline.
  */
-export function GameOver({ history, score, startSeed, seedDate, submission }: GameOverProps) {
+export function GameOver({ history, score, startSeed, seedDate, submission, soapPenalties: _soapPenalties }: GameOverProps) {
   const moves = history.length - 1;
   const hintedCount = history.filter((h) => h.hinted).length;
 

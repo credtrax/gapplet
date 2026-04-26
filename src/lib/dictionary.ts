@@ -14,6 +14,7 @@
  */
 
 import { WORDS_TEXT } from './wordList.ts';
+import { BLOCKLIST } from './blocklist.ts';
 
 let _dict: Set<string> | null = null;
 
@@ -41,4 +42,19 @@ export function isWord(word: string): boolean {
     return upper === 'A' || upper === 'I';
   }
   return getDict().has(upper);
+}
+
+/**
+ * Is this word in the LDNOOBW-derived blocklist? Used by validateBoard
+ * to tag rejection failures so the UI can apply the soap penalty
+ * (visible "naughty word" feedback + clock penalty) instead of a
+ * generic "not in dictionary" chain break.
+ *
+ * Blocklisted words are ALREADY excluded from the dictionary at build
+ * time, so isWord() returns false for them. This check is a separate
+ * affordance — "the rejection wasn't because this is gibberish, it was
+ * because this word is on the naughty list."
+ */
+export function isBlocklisted(word: string): boolean {
+  return BLOCKLIST.has(word.toUpperCase());
 }

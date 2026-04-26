@@ -75,6 +75,9 @@ const TIME_BONUS_THRESHOLD = 12;
 /** Seconds added to the clock for each qualifying move. */
 const TIME_BONUS_SECONDS = 2;
 
+/** Clock seconds deducted when a player attempts a blocklisted word. */
+const SOAP_PENALTY_SECONDS = 5;
+
 export function App() {
   // --- Core game state ---
   const [{ seed: startSeed, seedDate: startSeedDate, isPractice: isPracticeMode }] =
@@ -119,6 +122,10 @@ export function App() {
   // true when the tool is pressed; it clears on the next successful commit.
   const [idleSeconds, setIdleSeconds] = useState(0);
   const [eliminateActive, setEliminateActive] = useState(false);
+
+  // Count of blocklisted-word attempts. Used by the share emit to display
+  // a soap emoji per offense (handled in a follow-up commit).
+  const [soapPenalties, setSoapPenalties] = useState(0);
 
   // --- Status line ---
   const [statusMessage, setStatusMessage] = useState<string>(
@@ -370,6 +377,26 @@ export function App() {
 
     const v = validateBoard(nextBoard);
     if (!v.ok) {
+      if (v.blocklisted) {
+        // Soap penalty: chain break + clock penalty + counter for the
+        // share emit. The fancy soap-and-bubbles overlay is deferred to
+        // the animation-polish phase; for now the status message + clock
+        // tick communicate the penalty.
+        const newTime = Math.max(0, timeLeft - SOAP_PENALTY_SECONDS);
+        setTimeLeft(newTime);
+        setSoapPenalties((n) => n + 1);
+        setChain(CHAIN_START);
+        setSelectedIdx(null);
+        setStatusMessage(
+          `🧼 Naughty word — chain broken, −${SOAP_PENALTY_SECONDS} seconds. (Wash your mouth out.)`
+        );
+        setStatusTone('danger');
+        if (newTime === 0) {
+          stopTimer();
+          setGameOver(true);
+        }
+        return;
+      }
       setStatusMessage(`${v.reason}. Chain broken.`);
       setStatusTone('danger');
       setChain(CHAIN_START);
@@ -801,6 +828,7 @@ export function App() {
             startSeed={startSeed}
             seedDate={startSeedDate}
             submission={submission}
+            soapPenalties={soapPenalties}
           />
         )}
         {showHowTo && <HowToPlay onClose={closeHowTo} />}

@@ -7,7 +7,7 @@
  * in the React components.
  */
 
-import { isWord } from './dictionary.ts';
+import { isWord, isBlocklisted } from './dictionary.ts';
 import { LETTER_VALUES, SPACE, boardPoints } from './letterValues.ts';
 
 /**
@@ -19,10 +19,16 @@ export type Board = string[];
 
 /**
  * Result of validating a board configuration.
+ *
+ * The optional `blocklisted` flag on a failure result indicates that the
+ * rejected word is in the LDNOOBW-derived blocklist (not just absent
+ * from the dictionary). Clients use this to distinguish "you tried a
+ * naughty word" — soap penalty path — from "you tried gibberish"
+ * — generic chain-break path.
  */
 export type ValidationResult =
   | { ok: true; words: string[] }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; blocklisted?: boolean };
 
 /**
  * A single legal neighbor of a board — what the board would look like if
@@ -78,7 +84,11 @@ export function validateBoard(board: readonly string[]): ValidationResult {
     if (isWord(word)) {
       return { ok: true, words: [word] };
     }
-    return { ok: false, reason: `"${word}" isn't in the dictionary` };
+    return {
+      ok: false,
+      reason: `"${word}" isn't in the dictionary`,
+      blocklisted: isBlocklisted(word),
+    };
   }
 
   if (spaceCount === 1) {
@@ -86,6 +96,19 @@ export function validateBoard(board: readonly string[]): ValidationResult {
     // "CARS "), giving one 4-letter word. It's 2 when the space is interior,
     // giving two words like "A CAT" → ["A", "CAT"].
     const parts = board.join('').split(SPACE).filter((p) => p.length > 0);
+    // Two passes so that a blocklisted segment beats a generic gibberish
+    // segment for failure reporting — the soap penalty fires whenever
+    // the player's attempt contained a naughty word, even if some other
+    // segment was independently invalid.
+    for (const p of parts) {
+      if (!isWord(p) && isBlocklisted(p)) {
+        return {
+          ok: false,
+          reason: `"${p}" isn't in the dictionary`,
+          blocklisted: true,
+        };
+      }
+    }
     for (const p of parts) {
       if (!isWord(p)) {
         return { ok: false, reason: `"${p}" isn't in the dictionary` };
