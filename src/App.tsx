@@ -744,7 +744,7 @@ export function App() {
               style={{ height: '54px', display: 'block' }}
             />
             <div style={{ fontSize: '12px', color: 'var(--gapplet-muted)', marginTop: '4px' }}>
-              Seed: {startSeed}
+              {isPracticeMode ? `Seed: ${startSeed}` : `${startSeedDate}: ${startSeed}`}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
