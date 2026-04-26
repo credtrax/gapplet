@@ -166,6 +166,66 @@
 }
 
 /* ----------------------------------------------------------------------
+ * Ready-state marquee — bottom-half scrolling line that loops right-to-left
+ * when the game hasn't started yet. Two duplicated copies in the track so
+ * the loop is seamless (after translating one copy width, the second copy
+ * sits where the first started). The padding-right on each item keeps the
+ * track wider than any plausible container, eliminating end-of-cycle gaps.
+ * -------------------------------------------------------------------- */
+
+.pinball-marquee {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
+}
+
+.pinball-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: gapplet-marquee 14s linear infinite;
+  will-change: transform;
+}
+
+@keyframes gapplet-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.pinball-marquee-item {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 28em;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--gapplet-pinball-accent);
+  text-shadow: 0 0 6px currentColor, 0 0 14px currentColor;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.marquee-glasses {
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.45));
+}
+
+/* ----------------------------------------------------------------------
  * Gap drop indicators — vertical bars that appear in the seams between
  * tiles (and at the edges) when a letter is being dragged AND the board
  * has a space to absorb the shift. Pulse to draw attention; switch to

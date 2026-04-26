@@ -3,14 +3,23 @@ import { useEffect, useState } from 'react';
 /**
  * ActivityBox — the pinball-display panel under the board.
  *
- * Two regions stacked vertically inside a dark recessed frame:
- *   - Top ~1/3:    quiet space (reserved for future content; today empty).
- *   - Bottom ~2/3: the active surface. The status message sits centered
- *                  here and cross-fades on every change (fade out the old
- *                  message → swap content → fade in the new). Animation
- *                  overlays (score popup, time-bonus badge, charge-
- *                  earned celebration) layer absolutely on top of this
- *                  same region so they share the visual real estate.
+ * Two states:
+ *
+ *   READY (game hasn't started, no input yet):
+ *     - Top half:    static "Ready for you to start"
+ *     - Bottom half: marquee scrolling "Drag a tile or tap a cell to start."
+ *                    right-to-left, looping continuously.
+ *
+ *   PLAYING / GAME-OVER (the rest of the time):
+ *     - Top half:    quiet space
+ *     - Bottom half: status message centered, cross-fading on each change
+ *                    (fade out → swap → fade in over FADE_MS each direction).
+ *                    Animation overlays (score popup, time-bonus pill,
+ *                    charge-earned card) layer absolutely on this region.
+ *
+ * The whole content is wrapped in a single opacity-transitioned div, so a
+ * change of any of (statusMessage, tone, isReady) triggers a single
+ * cross-fade — no jarring snap when the ready state ends.
  */
 
 export type ActivityEvent = {
@@ -36,9 +45,10 @@ type Props = {
   event: ActivityEvent | null;
   statusMessage: string;
   tone: StatusTone;
+  /** True when the game hasn't started yet (no clock running, no game-over). */
+  isReady: boolean;
 };
 
-/** Map App's logical tone to the pinball-bright palette. */
 function pinballColor(tone: StatusTone): string {
   switch (tone) {
     case 'success': return 'var(--gapplet-pinball-success)';
@@ -51,23 +61,38 @@ function pinballColor(tone: StatusTone): string {
 
 const FADE_MS = 350;
 
-export function ActivityBox({ event, statusMessage, tone }: Props) {
-  // Cross-fade pipeline: when statusMessage or tone changes, fade out
-  // the currently-visible text, swap to the new content, fade in.
-  // shown.visible drives a CSS opacity transition on the same div, so
-  // the swap happens while opacity is at 0 — no flash.
-  const [shown, setShown] = useState<{ msg: string; tone: StatusTone; visible: boolean }>(
-    { msg: statusMessage, tone, visible: true }
-  );
+const READY_TOP_LINE = 'Ready for you to start';
+const READY_MARQUEE_LINE = 'Drag a tile or tap a cell to start.';
+
+type ShownState = {
+  msg: string;
+  tone: StatusTone;
+  isReady: boolean;
+  visible: boolean;
+};
+
+export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
+  const [shown, setShown] = useState<ShownState>({
+    msg: statusMessage,
+    tone,
+    isReady,
+    visible: true,
+  });
 
   useEffect(() => {
-    if (statusMessage === shown.msg && tone === shown.tone) return;
+    if (
+      statusMessage === shown.msg &&
+      tone === shown.tone &&
+      isReady === shown.isReady
+    ) {
+      return;
+    }
     setShown((s) => ({ ...s, visible: false }));
     const t = setTimeout(() => {
-      setShown({ msg: statusMessage, tone, visible: true });
+      setShown({ msg: statusMessage, tone, isReady, visible: true });
     }, FADE_MS);
     return () => clearTimeout(t);
-  }, [statusMessage, tone, shown.msg, shown.tone]);
+  }, [statusMessage, tone, isReady, shown.msg, shown.tone, shown.isReady]);
 
   return (
     <div
@@ -79,78 +104,140 @@ export function ActivityBox({ event, statusMessage, tone }: Props) {
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        overflow: 'visible',
+        overflow: 'hidden',
       }}
     >
-      {/* Top region — quiet space. Currently empty; reserved for future
-          content (e.g., chain multiplier readout, brand strip, etc.). */}
-      <div
-        aria-hidden="true"
-        style={{ flex: '0 0 26px' }}
-      />
-
-      {/* Bottom region — the active 2/3. Status text cross-fades here;
-          animation overlays layer absolutely on top. */}
       <div
         style={{
+          opacity: shown.visible ? 1 : 0,
+          transition: `opacity ${FADE_MS}ms ease-out`,
           flex: '1 1 auto',
-          position: 'relative',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingBottom: '12px',
+          flexDirection: 'column',
+          position: 'relative',
         }}
       >
+        {/* Top half */}
         <div
           style={{
-            opacity: shown.visible ? 1 : 0,
-            transition: `opacity ${FADE_MS}ms ease-out`,
+            flex: '1 1 50%',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            gap: '6px',
+            justifyContent: 'center',
             position: 'relative',
-            zIndex: 1,
           }}
         >
-          <div
-            className="pinball-status"
-            style={{
-              fontSize: '19px',
-              lineHeight: 1.3,
-              color: pinballColor(shown.tone),
-              fontWeight: shown.tone === 'info' || shown.tone === 'warning' ? 600 : 500,
-              textAlign: 'center',
-            }}
-          >
-            {shown.msg}
-          </div>
-          {/* Broken-chain icon: shows on any chain-break (tone='danger')
-              that isn't a soap penalty (those carry their own 🧼 already). */}
-          {shown.tone === 'danger' && !shown.msg.startsWith('🧼') && (
+          {shown.isReady && (
             <div
-              key={`bc-${shown.msg}`}
-              className="broken-chain-icon"
-              aria-hidden="true"
+              className="pinball-status"
+              style={{
+                fontSize: '19px',
+                lineHeight: 1.2,
+                color: 'var(--gapplet-pinball-accent)',
+                fontWeight: 600,
+                textAlign: 'center',
+              }}
             >
-              ⛓️‍💥
+              {READY_TOP_LINE}
             </div>
           )}
         </div>
 
-        {event && event.earned > 0 && (
-          <ScorePopup
-            key={`score-${event.id}`}
-            earned={event.earned}
-            multiplier={event.multiplier}
-            isStar={event.isStar}
-            isHint={event.isHint}
-          />
-        )}
-        {event && event.timeBonus > 0 && (
-          <TimeBonusBadge key={`time-${event.id}`} seconds={event.timeBonus} />
-        )}
-        {event && event.chargeEarned && <ChargeEarned key={`charge-${event.id}`} />}
+        {/* Bottom half */}
+        <div
+          style={{
+            flex: '1 1 50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+          }}
+        >
+          {shown.isReady ? (
+            <Marquee text={READY_MARQUEE_LINE} />
+          ) : (
+            <PlayingStatus msg={shown.msg} tone={shown.tone} />
+          )}
+
+          {/* Animation overlays only fire post-ready (event is null in ready). */}
+          {!shown.isReady && event && event.earned > 0 && (
+            <ScorePopup
+              key={`score-${event.id}`}
+              earned={event.earned}
+              multiplier={event.multiplier}
+              isStar={event.isStar}
+              isHint={event.isHint}
+            />
+          )}
+          {!shown.isReady && event && event.timeBonus > 0 && (
+            <TimeBonusBadge key={`time-${event.id}`} seconds={event.timeBonus} />
+          )}
+          {!shown.isReady && event && event.chargeEarned && (
+            <ChargeEarned key={`charge-${event.id}`} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlayingStatus({ msg, tone }: { msg: string; tone: StatusTone }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '6px',
+        position: 'relative',
+        zIndex: 1,
+      }}
+    >
+      <div
+        className="pinball-status"
+        style={{
+          fontSize: '19px',
+          lineHeight: 1.3,
+          color: pinballColor(tone),
+          fontWeight: tone === 'info' || tone === 'warning' ? 600 : 500,
+          textAlign: 'center',
+        }}
+      >
+        {msg}
+      </div>
+      {/* Broken-chain icon: shows on any chain-break (tone='danger') that
+          isn't a soap penalty (those carry their own 🧼 already). */}
+      {tone === 'danger' && !msg.startsWith('🧼') && (
+        <div
+          key={`bc-${msg}`}
+          className="broken-chain-icon"
+          aria-hidden="true"
+        >
+          ⛓️‍💥
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Marquee({ text }: { text: string }) {
+  // Two identical copies in the track, padded so each copy is wider than
+  // any reasonable container — that keeps the loop seamless (no empty gap
+  // when the track has scrolled exactly one copy width). Glasses motif
+  // 👓 flanks each instance so the eyeglasses theme from the logo
+  // recurs as the text scrolls past.
+  const item = (
+    <>
+      <span className="marquee-glasses" aria-hidden="true">👓</span>
+      <span>{text}</span>
+      <span className="marquee-glasses" aria-hidden="true">👓</span>
+    </>
+  );
+  return (
+    <div className="pinball-marquee">
+      <div className="pinball-marquee-track">
+        <span className="pinball-marquee-item">{item}</span>
+        <span className="pinball-marquee-item" aria-hidden="true">{item}</span>
       </div>
     </div>
   );

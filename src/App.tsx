@@ -755,6 +755,7 @@ export function App() {
           event={activityEvent}
           statusMessage={statusMessage}
           tone={statusTone}
+          isReady={!timerStarted && !gameOver}
         />
 
         <VirtualKeyboard
