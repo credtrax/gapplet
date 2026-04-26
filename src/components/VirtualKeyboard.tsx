@@ -1,4 +1,5 @@
 import { useDrag, type DragSource } from '../lib/drag';
+import { LETTER_VALUES } from '../lib/letterValues';
 
 type VirtualKeyboardProps = {
   onLetterKey: (letter: string) => void;
@@ -278,8 +279,10 @@ function DraggableLetterKey({
   startDrag: (source: DragSource, e: React.PointerEvent) => void;
 }) {
   const inactive = disabled || culled;
+  const value = LETTER_VALUES[letter] ?? 0;
   return (
     <button
+      className="gapplet-tile"
       onPointerDown={(e) => {
         if (inactive) return;
         startDrag({ kind: 'letter', letter }, e);
@@ -290,15 +293,41 @@ function DraggableLetterKey({
       }}
       disabled={disabled}
       style={{
-        ...LETTER_KEY_STYLE,
+        flex: 1,
+        minWidth: '28px',
+        minHeight: '52px',
+        padding: 0,
+        borderRadius: '5px',
+        fontSize: '22px',
+        fontWeight: 700,
+        fontFamily: 'Georgia, "Times New Roman", serif',
+        color: 'var(--gapplet-tile-fg)',
+        cursor: culled ? 'not-allowed' : 'grab',
+        touchAction: 'none',
+        userSelect: 'none',
+        position: 'relative',
         opacity: culled ? 0.28 : 1,
-        cursor: culled ? 'not-allowed' : LETTER_KEY_STYLE.cursor,
         transition: 'opacity 0.25s ease-out',
       }}
-      aria-label={`Letter ${letter}${culled ? ' (no legal moves)' : ''}`}
+      aria-label={`Letter ${letter}, ${value} ${value === 1 ? 'point' : 'points'}${culled ? ' (no legal moves)' : ''}`}
       aria-disabled={culled || undefined}
     >
       {letter}
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          bottom: '3px',
+          right: '5px',
+          fontSize: '10px',
+          fontWeight: 600,
+          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+          color: 'var(--gapplet-tile-fg)',
+          opacity: 0.7,
+        }}
+      >
+        {value}
+      </span>
     </button>
   );
 }
