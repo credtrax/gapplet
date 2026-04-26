@@ -668,10 +668,12 @@ export function App() {
           }}
         >
           <div>
-            <div style={{ fontSize: '22px', fontWeight: 500, letterSpacing: '0.02em' }}>
-              Gapplet
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--gapplet-muted)', marginTop: '2px' }}>
+            <img
+              src="/word-nerd-logo.png"
+              alt="Joe's Word Nerd"
+              style={{ height: '54px', display: 'block' }}
+            />
+            <div style={{ fontSize: '12px', color: 'var(--gapplet-muted)', marginTop: '4px' }}>
               Seed: {startSeed}
             </div>
           </div>

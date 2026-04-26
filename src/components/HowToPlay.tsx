@@ -8,21 +8,34 @@ type Slide = {
 
 const SLIDES: Slide[] = [
   {
-    title: 'Welcome to Gapplet',
+    title: "Welcome to Joe's Word Nerd",
     body: (
       <>
-        Five tiles. Two minutes. Chain together as many valid words as you can by
-        changing one tile at a time. Rare letters (Q, Z, J) score more.
+        Five tiles. Two minutes. Drag tiles to chain together as many valid
+        words as you can. Rare letters (Q, Z, J) score more.
       </>
     ),
-    visual: <MiniBoard cells={['W', 'A', 'T', 'E', 'R']} />,
+    visual: (
+      <img
+        src="/word-nerd-logo.png"
+        alt="Joe's Word Nerd"
+        style={{
+          maxWidth: '100%',
+          height: 'auto',
+          maxHeight: '160px',
+          display: 'block',
+        }}
+      />
+    ),
   },
   {
-    title: 'One cell per move',
+    title: 'Drag tiles to play',
     body: (
       <>
-        Tap a tile, pick a new letter, press <strong>Enter</strong>. The result must
-        form a valid word. Change more than one tile at a time and your chain breaks.
+        Drag a letter from the keyboard onto a cell. Drop the{' '}
+        <strong>⌫</strong> tile on a cell to remove it. Drop{' '}
+        <strong>Space</strong> to insert a gap. Or drag one board cell onto
+        another to <strong>swap</strong> them.
       </>
     ),
     visual: (
@@ -54,7 +67,9 @@ const SLIDES: Slide[] = [
       </>
     ),
     visual: (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+      <div
+        style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}
+      >
         <MiniBoard cells={['H', 'E', 'A', 'R', 'T']} caption="HEART" />
         <MiniBoard cells={['C', 'A', 'R', 'S', ' ']} caption="CARS + edge space" />
         <MiniBoard cells={['A', ' ', 'C', 'A', 'T']} caption="A + CAT" />
@@ -62,13 +77,46 @@ const SLIDES: Slide[] = [
     ),
   },
   {
+    title: 'Chains build score',
+    body: (
+      <>
+        Each valid move adds <strong>+0.2</strong> to your chain multiplier.
+        Score = sum of letter values × multiplier. Repeat a board or play an
+        invalid word and the chain resets to <strong>×1.0</strong>.
+      </>
+    ),
+    visual: (
+      <div
+        style={{
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          lineHeight: 1.8,
+          textAlign: 'center',
+        }}
+      >
+        <div>
+          HEART <span style={{ color: 'var(--gapplet-success)' }}>×1.2</span> = 8 pts
+        </div>
+        <div>
+          HEARS <span style={{ color: 'var(--gapplet-success)' }}>×1.4</span> = 9 pts
+        </div>
+        <div>
+          HEARD <span style={{ color: 'var(--gapplet-success)' }}>×1.6</span> = 11 pts
+        </div>
+        <div>
+          HEART <span style={{ color: 'var(--gapplet-danger)' }}>repeat → ×1.0</span>
+        </div>
+      </div>
+    ),
+  },
+  {
     title: 'Star moves double your chain',
     body: (
       <>
-        Create a space in the <strong>middle</strong> — position 2, 3, or 4 — and your
-        chain multiplier <strong>doubles</strong> (no cap). These "star moves" are rare
-        and worth hunting for. Shown as <span style={{ fontSize: '16px' }}>🟢</span> in
-        the share.
+        Drop the Space tile in the <strong>middle</strong> — position 2, 3, or
+         4 — and your chain multiplier <strong>doubles</strong> (no cap). Star
+        moves are rare and worth hunting. Shown as{' '}
+        <span style={{ fontSize: '16px' }}>🟢</span> in the share.
       </>
     ),
     visual: (
@@ -88,21 +136,63 @@ const SLIDES: Slide[] = [
     ),
   },
   {
-    title: 'Chains build score',
+    title: 'Three tools at the top',
+    body: (
+      <ul style={{ margin: 0, padding: '0 0 0 1.1rem', lineHeight: 1.55 }}>
+        <li>
+          <strong>Restart Chain</strong> — back to the seed when you're stuck.
+          Chain resets to ×1.0.
+        </li>
+        <li>
+          <strong>Buy Guess</strong> — earn one charge per 100 points; spend it
+          for a free legal letter (chain holds, doesn't advance).
+        </li>
+        <li>
+          <strong>Eliminate</strong> — after 10s of inactivity, greys out the
+          letters that can't form any next word. Costs your chain multiplier.
+        </li>
+      </ul>
+    ),
+    visual: (
+      <div style={{ display: 'flex', gap: '4px', width: '100%', maxWidth: '300px' }}>
+        <ToolMini label="Restart" />
+        <ToolMini label="Buy Guess" meterColor="var(--gapplet-hint)" meterPercent={45} />
+        <ToolMini label="Eliminate" meterColor="var(--gapplet-success)" meterPercent={70} />
+      </div>
+    ),
+  },
+  {
+    title: 'Big plays earn time',
     body: (
       <>
-        Each valid move adds <strong>+0.2</strong> to your chain multiplier. Star moves
-        double it. Your score per move is the sum of board letter values, times the
-        multiplier. <strong>Buy a guess</strong> gives you a hint (one per minute, no
-        stacking) — hinted moves hold the chain but don't advance it.
+        Any move scoring <strong>12+ points</strong> (after the multiplier) adds{' '}
+        <strong>+2 seconds</strong> to your clock.{' '}
+        <span style={{ fontSize: '16px' }}>🧼</span> Naughty words break your
+        chain <em>and</em> cost <strong>5 seconds</strong>. Play nice.
       </>
     ),
     visual: (
-      <div style={{ fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.8, textAlign: 'center' }}>
-        <div>HEART <span style={{ color: 'var(--gapplet-success)' }}>×1.2</span> = 8 pts</div>
-        <div>HEARS <span style={{ color: 'var(--gapplet-success)' }}>×1.4</span> = 9 pts</div>
-        <div>HEARD <span style={{ color: 'var(--gapplet-success)' }}>×1.6</span> = 11 pts</div>
-        <div>HEART <span style={{ color: 'var(--gapplet-danger)' }}>repeat → ×1.0</span></div>
+      <div
+        style={{
+          display: 'flex',
+          gap: '24px',
+          justifyContent: 'center',
+          alignItems: 'center',
+          fontFamily: 'monospace',
+        }}
+      >
+        <div style={{ textAlign: 'center', color: 'var(--gapplet-success)' }}>
+          <div style={{ fontSize: '28px', fontWeight: 700 }}>+2s</div>
+          <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            big play
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', color: 'var(--gapplet-danger)' }}>
+          <div style={{ fontSize: '28px' }}>🧼</div>
+          <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            −5s
+          </div>
+        </div>
       </div>
     ),
   },
@@ -110,9 +200,9 @@ const SLIDES: Slide[] = [
     title: 'One puzzle a day',
     body: (
       <>
-        Everyone plays the same seed each day (UTC midnight rotation). Your score posts
-        to a global leaderboard. Share the emoji timeline — spoiler-free, fun to brag.
-        Come back tomorrow for the next one.
+        Everyone plays the same seed each day (UTC midnight rotation). Your
+        score posts to a global leaderboard. Share the emoji timeline —
+        spoiler-free, fun to brag. Come back tomorrow for the next one.
       </>
     ),
     visual: (
@@ -125,10 +215,10 @@ const SLIDES: Slide[] = [
           color: 'var(--gapplet-fg)',
         }}
       >
-        <div style={{ fontWeight: 500 }}>Gapplet 2026-04-22</div>
+        <div style={{ fontWeight: 500 }}>Joe's Word Nerd 2026-04-26</div>
         <div style={{ color: 'var(--gapplet-muted)' }}>847 pts · ×4.4 peak · 14 moves</div>
         <div style={{ fontSize: '18px', margin: '8px 0' }}>🟩🟩🟨🟢🟦🟩🟥🟢🟩🟩🟩🟩</div>
-        <div style={{ color: 'var(--gapplet-muted)' }}>gapplet.joecorn.com</div>
+        <div style={{ color: 'var(--gapplet-muted)' }}>joecorn.com</div>
       </div>
     ),
   },
@@ -139,12 +229,13 @@ type Props = {
 };
 
 /**
- * First-time player tutorial — a 6-slide swipeable deck covering the
+ * First-time player tutorial — an 8-slide swipeable deck covering the
  * mechanics that new players need but that aren't obvious from the
  * stripped-down in-game UI. Auto-opens on first visit (localStorage
  * guarded in App.tsx); reopens via the "?" button in the header.
  *
- * Keyboard: ← → to navigate, Esc to close.
+ * Keyboard: ← → to navigate, Esc to close. (Local to this modal; the
+ * game itself has no hardware keyboard input in the drag-input model.)
  */
 export function HowToPlay({ onClose }: Props) {
   const [idx, setIdx] = useState(0);
@@ -270,11 +361,7 @@ export function HowToPlay({ onClose }: Props) {
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            onClick={() => setIdx(idx - 1)}
-            disabled={atFirst}
-            style={{ flex: 1 }}
-          >
+          <button onClick={() => setIdx(idx - 1)} disabled={atFirst} style={{ flex: 1 }}>
             ← Prev
           </button>
           <button
@@ -292,8 +379,8 @@ export function HowToPlay({ onClose }: Props) {
 /**
  * Miniature 5-tile board for illustrations. Uses the same palette tokens
  * as the real Board component so the tutorial visuals stay on-brand.
- * Optional `highlight` paints one cell with the "dirty" yellow to signal
- * "this is the cell that changed." Optional `caption` labels the state.
+ * Optional `highlight` paints one cell as the changed cell. Optional
+ * `caption` labels the state.
  */
 function MiniBoard({
   cells,
@@ -316,7 +403,6 @@ function MiniBoard({
             <div
               key={i}
               className={classes.join(' ')}
-              data-state={isHi ? 'hinted' : undefined}
               style={{
                 width: '26px',
                 height: '34px',
@@ -328,13 +414,10 @@ function MiniBoard({
                 fontWeight: 700,
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 color: isSpace ? 'var(--gapplet-muted)' : 'var(--gapplet-tile-fg)',
-                // Override the tile's dirty-hinted styles for the "highlight"
-                // cell in tutorial visuals; we want a dirty-yellow ring to
-                // signal "this cell changed" in the before/after pair.
                 ...(isHi
                   ? {
                       boxShadow:
-                        '0 0 0 2px var(--gapplet-dirty), 0 2px 4px var(--gapplet-tile-drop), inset 0 1px 0 var(--gapplet-tile-highlight), inset 0 -1px 0 var(--gapplet-tile-bevel)',
+                        '0 0 0 2px var(--gapplet-success), 0 2px 4px var(--gapplet-tile-drop), inset 0 1px 0 var(--gapplet-tile-highlight), inset 0 -1px 0 var(--gapplet-tile-bevel)',
                     }
                   : null),
               }}
@@ -348,6 +431,55 @@ function MiniBoard({
         <div style={{ fontSize: '11px', color: 'var(--gapplet-muted)' }}>
           {caption}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Miniature tool button used by the "Three tools" tutorial slide. Mirrors
+ * the real top-row button styling at small scale, with an optional meter
+ * fill at the bottom for the Buy Guess and Eliminate states.
+ */
+function ToolMini({
+  label,
+  meterColor,
+  meterPercent,
+}: {
+  label: string;
+  meterColor?: string;
+  meterPercent?: number;
+}) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        padding: '8px 4px',
+        background: 'rgba(0, 0, 0, 0.08)',
+        borderRadius: '4px',
+        fontSize: '9px',
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        textAlign: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        color: 'var(--gapplet-fg)',
+      }}
+    >
+      {label}
+      {meterColor !== undefined && meterPercent !== undefined && (
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: 0,
+            bottom: 0,
+            height: '2px',
+            width: `${meterPercent}%`,
+            background: meterColor,
+          }}
+        />
       )}
     </div>
   );
