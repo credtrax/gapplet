@@ -21,7 +21,7 @@ import {
   type Neighbor,
 } from './lib/game';
 import { SPACE } from './lib/letterValues';
-import { DragProvider, type DragSource } from './lib/drag';
+import { DragProvider, type DragSource, type DropTarget } from './lib/drag';
 
 const GAME_DURATION_SECONDS = 120;
 
@@ -553,14 +553,41 @@ export function App() {
   // Drop handler — every drag gesture funnels through here.
   // ------------------------------------------------------------------
 
-  const handleDrop = (source: DragSource, targetIdx: number | null) => {
+  const handleDrop = (source: DragSource, target: DropTarget | null) => {
     if (gameOver) return;
-    if (targetIdx == null) return;
+    if (target == null) return;
     const prev = history[history.length - 1].board;
 
+    // Gap drops: insert-with-shift, only valid for letter sources, only
+    // when there's a space on the board to absorb the shift. Math:
+    //   k = index of the existing space
+    //   g = gap index (1..4, between cells g-1 and g)
+    //   if g <= k: shift cells [g, k-1] right by 1, place letter at g
+    //   if g >  k: shift cells [k+1, g-1] left  by 1, place letter at g-1
+    // Adjacent-to-space and edge cases reduce to existing cell-drop
+    // behavior, which is fine — they end up at the same nextBoard.
+    if (target.kind === 'gap') {
+      if (source.kind !== 'letter') return;
+      if (disabledLetters.has(source.letter)) return;
+      const k = prev.indexOf(SPACE);
+      if (k < 0) return; // no space to absorb the shift; gap drop is a no-op
+      const g = target.idx;
+      const next = prev.slice();
+      if (g <= k) {
+        for (let i = k; i > g; i--) next[i] = next[i - 1];
+        next[g] = source.letter;
+      } else {
+        for (let i = k; i < g - 1; i++) next[i] = next[i + 1];
+        next[g - 1] = source.letter;
+      }
+      attemptCommit(next);
+      return;
+    }
+
+    // Cell drops: existing replace / remove / set-space / swap semantics.
+    const targetIdx = target.idx;
+
     if (source.kind === 'letter') {
-      // Block useless letters when Eliminate is active. The grey-out is
-      // visual; this is the functional block at the drag boundary.
       if (disabledLetters.has(source.letter)) return;
       const next = prev.slice();
       next[targetIdx] = source.letter;
@@ -768,7 +795,7 @@ export function App() {
               setStatusTone('info');
               return;
             }
-            handleDrop({ kind: 'backspace' }, selectedIdx);
+            handleDrop({ kind: 'backspace' }, { kind: 'cell', idx: selectedIdx });
           }}
           onSpace={() => {
             if (gameOver) return;
@@ -777,7 +804,7 @@ export function App() {
               setStatusTone('info');
               return;
             }
-            handleDrop({ kind: 'space' }, selectedIdx);
+            handleDrop({ kind: 'space' }, { kind: 'cell', idx: selectedIdx });
           }}
           onRestartChain={restartChain}
           onBuyHint={buyHint}

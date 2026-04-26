@@ -25,13 +25,26 @@ export type DragSource =
   | { kind: 'space' }
   | { kind: 'board-cell'; idx: number; letter: string };
 
+/**
+ * A drop target — either a board cell (drop-on, replace semantics) or a
+ * gap between cells (drop-between, insert-with-shift semantics enabled
+ * when the board has a space). idx semantics:
+ *   - cell: 0..4  (which cell the pointer is over)
+ *   - gap:  1..4  (which seam between cells; gap N is between cell N-1
+ *           and cell N. the new letter, if accepted, lands at index N
+ *           when shifting right, or N-1 when shifting left)
+ */
+export type DropTarget =
+  | { kind: 'cell'; idx: number }
+  | { kind: 'gap'; idx: number };
+
 type DragState = {
   /** The source being actively dragged (post-threshold). null = not dragging. */
   active: DragSource | null;
   /** Latest pointer position in viewport coordinates. */
   pointerPos: { x: number; y: number } | null;
-  /** Cell index (0–4) the pointer is currently over, or null if off-board. */
-  hoverTargetIdx: number | null;
+  /** What the pointer is currently over (cell, gap, or off-board). */
+  hoverTarget: DropTarget | null;
 };
 
 type DragContextValue = {
@@ -51,25 +64,29 @@ const DragContext = createContext<DragContextValue | null>(null);
 const DRAG_START_THRESHOLD_PX = 5;
 
 /**
- * Mark drop targets with this data attribute (value = cell index 0–4).
- * The drag system uses elementFromPoint to identify the target, which
- * means cells don't each need to wire their own pointer-enter/leave
- * handlers — the source of truth is the geometry under the pointer.
+ * Mark drop targets with these data attributes. The drag system uses
+ * elementFromPoint + closest() to identify the topmost target under the
+ * pointer, which means cells/gaps don't each need to wire their own
+ * pointer-enter/leave handlers — the source of truth is the geometry.
+ *
+ *   data-drop-target-idx="N" → cell N (0..4),  replace semantics
+ *   data-drop-gap-idx="N"    → gap N (1..4),  insert-with-shift
  */
 export const DROP_TARGET_ATTR = 'data-drop-target-idx';
+export const DROP_GAP_ATTR = 'data-drop-gap-idx';
 
 export function DragProvider({
   children,
   onDrop,
 }: {
   children: ReactNode;
-  /** Called once on pointer-up. targetIdx is null if released off any cell. */
-  onDrop: (source: DragSource, targetIdx: number | null) => void;
+  /** Called once on pointer-up. target is null if released off any cell or gap. */
+  onDrop: (source: DragSource, target: DropTarget | null) => void;
 }) {
   const [state, setState] = useState<DragState>({
     active: null,
     pointerPos: null,
-    hoverTargetIdx: null,
+    hoverTarget: null,
   });
 
   // Refs so the global pointer listeners read fresh values without
@@ -87,13 +104,24 @@ export function DragProvider({
   }, []);
 
   useEffect(() => {
-    const targetIdxAt = (x: number, y: number): number | null => {
+    const targetAt = (x: number, y: number): DropTarget | null => {
       const elem = document.elementFromPoint(x, y);
-      const target = elem?.closest(`[${DROP_TARGET_ATTR}]`) as HTMLElement | null;
-      const raw = target?.getAttribute(DROP_TARGET_ATTR);
-      if (raw == null) return null;
-      const idx = parseInt(raw, 10);
-      return Number.isFinite(idx) ? idx : null;
+      // closest() walks ancestors looking for either attribute; whichever
+      // we hit first wins. Gap zones and cells aren't nested inside each
+      // other so there's no ambiguity from the geometry itself.
+      const node = elem?.closest(`[${DROP_TARGET_ATTR}], [${DROP_GAP_ATTR}]`) as HTMLElement | null;
+      if (!node) return null;
+      const cellRaw = node.getAttribute(DROP_TARGET_ATTR);
+      if (cellRaw != null) {
+        const idx = parseInt(cellRaw, 10);
+        return Number.isFinite(idx) ? { kind: 'cell', idx } : null;
+      }
+      const gapRaw = node.getAttribute(DROP_GAP_ATTR);
+      if (gapRaw != null) {
+        const idx = parseInt(gapRaw, 10);
+        return Number.isFinite(idx) ? { kind: 'gap', idx } : null;
+      }
+      return null;
     };
 
     const handleMove = (e: PointerEvent) => {
@@ -110,7 +138,7 @@ export function DragProvider({
       setState({
         active: activeRef.current,
         pointerPos: { x: e.clientX, y: e.clientY },
-        hoverTargetIdx: targetIdxAt(e.clientX, e.clientY),
+        hoverTarget: targetAt(e.clientX, e.clientY),
       });
     };
 
@@ -124,7 +152,7 @@ export function DragProvider({
       if (!wasActive) {
         // Below threshold — treat as a click. The element's own onClick
         // handler will fire on the natural click event that follows.
-        setState({ active: null, pointerPos: null, hoverTargetIdx: null });
+        setState({ active: null, pointerPos: null, hoverTarget: null });
         return;
       }
 
@@ -140,15 +168,15 @@ export function DragProvider({
       // outside any clickable element).
       setTimeout(() => window.removeEventListener('click', suppress, { capture: true }), 100);
 
-      const targetIdx = targetIdxAt(e.clientX, e.clientY);
-      setState({ active: null, pointerPos: null, hoverTargetIdx: null });
-      onDropRef.current(wasActive, targetIdx);
+      const target = targetAt(e.clientX, e.clientY);
+      setState({ active: null, pointerPos: null, hoverTarget: null });
+      onDropRef.current(wasActive, target);
     };
 
     const handleCancel = () => {
       pendingRef.current = null;
       activeRef.current = null;
-      setState({ active: null, pointerPos: null, hoverTargetIdx: null });
+      setState({ active: null, pointerPos: null, hoverTarget: null });
     };
 
     window.addEventListener('pointermove', handleMove);
