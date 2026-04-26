@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { LETTER_VALUES } from '../lib/letterValues';
 
 type Slide = {
   title: string;
@@ -166,9 +167,10 @@ const SLIDES: Slide[] = [
     body: (
       <>
         Any move scoring <strong>15+ points</strong> (after the multiplier) adds{' '}
-        <strong>+2 seconds</strong> to your clock.{' '}
-        <span style={{ fontSize: '16px' }}>🧼</span> Naughty words break your
-        chain <em>and</em> cost <strong>5 seconds</strong>. Play nice.
+        <strong>+0:02</strong> to your clock.{' '}
+        <span style={{ fontSize: '16px' }}>🧼</span> Naughty words trigger a{' '}
+        <strong>5-second cleansing lockout</strong> — the game suspends while
+        the soap washes. Play nice.
       </>
     ),
     visual: (
@@ -182,7 +184,7 @@ const SLIDES: Slide[] = [
         }}
       >
         <div style={{ textAlign: 'center', color: 'var(--gapplet-success)' }}>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>+2s</div>
+          <div style={{ fontSize: '24px', fontWeight: 700 }}>+0:02</div>
           <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             big play
           </div>
@@ -190,7 +192,7 @@ const SLIDES: Slide[] = [
         <div style={{ textAlign: 'center', color: 'var(--gapplet-danger)' }}>
           <div style={{ fontSize: '28px' }}>🧼</div>
           <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            −5s
+            5 s lock
           </div>
         </div>
       </div>
@@ -222,6 +224,18 @@ const SLIDES: Slide[] = [
       </div>
     ),
   },
+  {
+    title: 'Letter values',
+    body: (
+      <>
+        Standard Scrabble scoring. Common letters score{' '}
+        <strong>1 point</strong>; rare ones (J, Q, X, Z) score{' '}
+        <strong>up to 10</strong>. Your move's score is the sum of all letter
+        values on the board, multiplied by your chain.
+      </>
+    ),
+    visual: <LetterValueChart />,
+  },
 ];
 
 type Props = {
@@ -229,7 +243,7 @@ type Props = {
 };
 
 /**
- * First-time player tutorial — an 8-slide swipeable deck covering the
+ * First-time player tutorial — a 9-slide swipeable deck covering the
  * mechanics that new players need but that aren't obvious from the
  * stripped-down in-game UI. Auto-opens on first visit (localStorage
  * guarded in App.tsx); reopens via the "?" button in the header.
@@ -372,6 +386,100 @@ export function HowToPlay({ onClose }: Props) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Letter-values chart — the full 26-letter Scrabble scoring grid grouped
+ * by point value. Each tile is small but uses the same gapplet-tile
+ * palette as the real board so the visual reads as "these are your
+ * playing pieces."
+ */
+function LetterValueChart() {
+  const byValue: Record<number, string[]> = {};
+  for (const [letter, value] of Object.entries(LETTER_VALUES)) {
+    if (!byValue[value]) byValue[value] = [];
+    byValue[value].push(letter);
+  }
+  const values = Object.keys(byValue).map(Number).sort((a, b) => a - b);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '5px',
+        alignItems: 'stretch',
+        width: '100%',
+        maxWidth: '320px',
+      }}
+    >
+      {values.map((v) => (
+        <div
+          key={v}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              minWidth: '34px',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--gapplet-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              textAlign: 'right',
+            }}
+          >
+            {v} pt
+          </div>
+          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+            {byValue[v].sort().map((letter) => (
+              <LetterTile key={letter} letter={letter} value={v} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LetterTile({ letter, value }: { letter: string; value: number }) {
+  return (
+    <div
+      className="gapplet-tile"
+      style={{
+        width: '24px',
+        height: '28px',
+        borderRadius: '3px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '14px',
+        fontWeight: 700,
+        fontFamily: 'Georgia, "Times New Roman", serif',
+        position: 'relative',
+        color: 'var(--gapplet-tile-fg)',
+      }}
+    >
+      {letter}
+      <span
+        style={{
+          position: 'absolute',
+          bottom: '1px',
+          right: '2px',
+          fontSize: '8px',
+          fontWeight: 600,
+          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+          opacity: 0.7,
+        }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
