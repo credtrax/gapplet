@@ -756,19 +756,7 @@ export function App() {
               neighborCount={unusedNeighborCount}
               hardMode={false}
             />
-            <button
-              onClick={() => setShowHowTo(true)}
-              aria-label="How to play"
-              title="How to play"
-              style={{
-                fontSize: '14px',
-                padding: '0.35rem 0.6rem',
-                fontWeight: 600,
-              }}
-            >
-              ?
-            </button>
-            <HamburgerMenu />
+            <HamburgerMenu onShowHowTo={() => setShowHowTo(true)} />
           </div>
         </div>
 

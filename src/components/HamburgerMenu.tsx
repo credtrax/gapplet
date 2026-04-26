@@ -3,18 +3,13 @@ import { useAuth } from '../lib/auth';
 import { SignInModal } from './SignInModal';
 
 /**
- * Hamburger menu in the header — replaces the standalone Sign-in button
- * + name dropdown. For consistency at narrow viewports (iPhone, etc.)
- * the auth controls move behind a single ☰ that opens a small dropdown
- * panel.
- *
- * Today the panel only contains auth (Sign in OR a "Signed in as NAME"
- * row + Sign out). Future home for Score History, Settings, How-to-Play
- * link, etc.
+ * Hamburger menu in the header — single ☰ that opens a small dropdown
+ * panel. Holds auth controls + a "How to play" trigger today; future
+ * home for Score History, Settings, etc.
  *
  * Closes on outside-pointer or Escape.
  */
-export function HamburgerMenu() {
+export function HamburgerMenu({ onShowHowTo }: { onShowHowTo: () => void }) {
   const { profile, loading, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -100,8 +95,6 @@ export function HamburgerMenu() {
                   padding: '0 0.75rem 0.5rem',
                   fontSize: '14px',
                   fontWeight: 500,
-                  borderBottom: '0.5px solid var(--gapplet-border)',
-                  marginBottom: '0.25rem',
                 }}
               >
                 {profile.display_name}
@@ -129,6 +122,23 @@ export function HamburgerMenu() {
               Sign in
             </button>
           )}
+          <div
+            aria-hidden="true"
+            style={{
+              borderTop: '0.5px solid var(--gapplet-border)',
+              margin: '0.25rem 0',
+            }}
+          />
+          <button
+            onClick={() => {
+              setOpen(false);
+              onShowHowTo();
+            }}
+            role="menuitem"
+            style={MENU_ITEM_STYLE}
+          >
+            How to play
+          </button>
         </div>
       )}
       {modalOpen && <SignInModal onClose={() => setModalOpen(false)} />}
