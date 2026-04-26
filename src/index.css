@@ -196,7 +196,7 @@
 .pinball-marquee-track {
   display: flex;
   width: max-content;
-  animation: gapplet-marquee 14s linear infinite;
+  animation: gapplet-marquee 11.2s linear infinite;
   will-change: transform;
 }
 
@@ -209,9 +209,9 @@
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding-right: 28em;
-  font-size: 17px;
+  font-size: 26px;
   font-weight: 600;
   color: var(--gapplet-pinball-accent);
   text-shadow: 0 0 6px currentColor, 0 0 14px currentColor;
@@ -220,7 +220,7 @@
 }
 
 .marquee-glasses {
-  font-size: 22px;
+  font-size: 32px;
   line-height: 1;
   filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.45));
 }
