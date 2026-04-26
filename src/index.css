@@ -313,6 +313,52 @@
 }
 
 /* ----------------------------------------------------------------------
+ * Soap penalty — full-panel overlay during the 5-second cleansing
+ * lockout. Top text reads the penalty, bottom is a green countdown,
+ * and bubbles loop through pop-in/pop-out animations across the panel.
+ * The bubbles render OVER the text so they look like soap "washing
+ * away" the naughty word.
+ * -------------------------------------------------------------------- */
+
+.soap-emoji {
+  font-size: 19px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+}
+
+.soap-bubbles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 8;
+}
+
+@keyframes gapplet-soap-bubble {
+  0%   { opacity: 0; transform: scale(0.3) translateY(4px); }
+  18%  { opacity: 0.85; transform: scale(1) translateY(0); }
+  55%  { opacity: 0.65; transform: scale(1.1) translateY(-2px); }
+  100% { opacity: 0; transform: scale(1.4) translateY(-6px); }
+}
+
+.soap-bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 28%,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(220, 235, 255, 0.7) 50%,
+    rgba(160, 200, 250, 0.35) 100%
+  );
+  box-shadow:
+    inset 0 0 5px rgba(255, 255, 255, 0.7),
+    inset -1px -2px 4px rgba(180, 210, 250, 0.4),
+    0 0 10px rgba(200, 225, 255, 0.55);
+  animation: gapplet-soap-bubble 1.6s ease-out infinite;
+  opacity: 0;
+}
+
+/* ----------------------------------------------------------------------
  * Dirty-cell pulse — yellow ring that throbs to signal uncommitted edits.
  * Box-shadow stack includes the base tile shadows so the tile stays
  * raised while the ring pulses.

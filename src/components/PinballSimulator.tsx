@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityBox, type ActivityEvent } from './ActivityBox';
 
 /**
@@ -28,6 +28,9 @@ type Scenario = {
   readyTopLine?: string;
   /** Sample seconds remaining; only matters for the clock-running display. */
   timeLeft?: number;
+  /** When true, clicking this scenario kicks off the 5-second soap-penalty
+   * countdown so the bubbles + countdown UI can be previewed live. */
+  triggersSoapPenalty?: boolean;
 };
 
 const SCENARIOS: Scenario[] = [
@@ -211,12 +214,13 @@ const SCENARIOS: Scenario[] = [
     event: null,
   },
   {
-    label: 'Soap penalty',
+    label: 'Soap penalty (5 s lockout)',
     category: 'Failures',
-    msg: '🧼 Naughty word — chain broken, −5 seconds. (Wash your mouth out.)',
+    msg: '🧼 Naughty Word - chain broken. 5 second cleansing penalty 🧼',
     tone: 'danger',
     isReady: false,
     event: null,
+    triggersSoapPenalty: true,
   },
 
   // --- Tools ---
@@ -265,16 +269,30 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
+const SOAP_PENALTY_SECONDS = 5;
+
 export function PinballSimulator() {
   const [current, setCurrent] = useState<Scenario>(SCENARIOS[0]);
   const idRef = useRef(0);
   const [event, setEvent] = useState<ActivityEvent | null>(null);
+  const [soapRemaining, setSoapRemaining] = useState(0);
 
   const trigger = (s: Scenario) => {
     idRef.current += 1;
     setCurrent({ ...s });
     setEvent(s.event ? { ...s.event, id: idRef.current } : null);
+    setSoapRemaining(s.triggersSoapPenalty ? SOAP_PENALTY_SECONDS : 0);
   };
+
+  // Soap-penalty countdown — ticks down once a second when armed, then
+  // stops at 0. Each click of the soap button restarts it from 5.
+  useEffect(() => {
+    if (soapRemaining <= 0) return;
+    const t = setTimeout(() => {
+      setSoapRemaining((r) => Math.max(0, r - 1));
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [soapRemaining]);
 
   const byCategory = SCENARIOS.reduce<Record<string, Scenario[]>>((acc, s) => {
     if (!acc[s.category]) acc[s.category] = [];
@@ -322,6 +340,7 @@ export function PinballSimulator() {
         isReady={current.isReady}
         readyTopLine={current.readyTopLine}
         timeLeft={current.timeLeft}
+        soapPenaltyRemaining={soapRemaining}
       />
 
       <div

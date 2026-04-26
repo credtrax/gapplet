@@ -54,6 +54,11 @@ type Props = {
    * the "Clock running" two-line display. Updates re-render the
    * countdown text directly — no cross-fade per tick. */
   timeLeft?: number;
+  /** Seconds remaining on the soap-penalty lockout. > 0 puts the panel
+   * into the dedicated "🧼 Naughty Word" cleansing display with a live
+   * green countdown and animated bubbles. Updates re-render the
+   * countdown text directly — no cross-fade per tick. */
+  soapPenaltyRemaining?: number;
 };
 
 function pinballColor(tone: StatusTone): string {
@@ -104,6 +109,7 @@ type ShownState = {
   tone: StatusTone;
   isReady: boolean;
   readyTopLine: string;
+  isSoapActive: boolean;
   visible: boolean;
 };
 
@@ -114,12 +120,15 @@ export function ActivityBox({
   isReady,
   readyTopLine = DEFAULT_READY_TOP_LINE,
   timeLeft,
+  soapPenaltyRemaining = 0,
 }: Props) {
+  const isSoapActive = soapPenaltyRemaining > 0;
   const [shown, setShown] = useState<ShownState>({
     msg: statusMessage,
     tone,
     isReady,
     readyTopLine,
+    isSoapActive,
     visible: true,
   });
 
@@ -128,13 +137,21 @@ export function ActivityBox({
       statusMessage === shown.msg &&
       tone === shown.tone &&
       isReady === shown.isReady &&
-      readyTopLine === shown.readyTopLine
+      readyTopLine === shown.readyTopLine &&
+      isSoapActive === shown.isSoapActive
     ) {
       return;
     }
     setShown((s) => ({ ...s, visible: false }));
     const t = setTimeout(() => {
-      setShown({ msg: statusMessage, tone, isReady, readyTopLine, visible: true });
+      setShown({
+        msg: statusMessage,
+        tone,
+        isReady,
+        readyTopLine,
+        isSoapActive,
+        visible: true,
+      });
     }, FADE_MS);
     return () => clearTimeout(t);
   }, [
@@ -142,18 +159,20 @@ export function ActivityBox({
     tone,
     isReady,
     readyTopLine,
+    isSoapActive,
     shown.msg,
     shown.tone,
     shown.isReady,
     shown.readyTopLine,
+    shown.isSoapActive,
   ]);
 
-  const isClockRunning = !shown.isReady && shown.msg.startsWith('Clock running');
-  const isSoapPenalty = !shown.isReady && shown.msg.startsWith('🧼');
+  const isClockRunning =
+    !shown.isReady && !shown.isSoapActive && shown.msg.startsWith('Clock running');
   const isChainBreak =
-    !shown.isReady && shown.tone === 'danger' && !isSoapPenalty;
+    !shown.isReady && !shown.isSoapActive && shown.tone === 'danger';
   const cel =
-    !shown.isReady && !isClockRunning && !isChainBreak
+    !shown.isReady && !shown.isSoapActive && !isClockRunning && !isChainBreak
       ? celebrationText(event)
       : '';
 
@@ -204,6 +223,8 @@ export function ActivityBox({
             >
               {shown.readyTopLine}
             </div>
+          ) : shown.isSoapActive ? (
+            <SoapPenaltyTop />
           ) : isClockRunning ? (
             <ClockRunningTop timeLeft={timeLeft ?? 0} />
           ) : isChainBreak ? (
@@ -229,6 +250,8 @@ export function ActivityBox({
         >
           {shown.isReady ? (
             <Marquee text={READY_MARQUEE_LINE} />
+          ) : shown.isSoapActive ? (
+            <SoapCountdown remaining={soapPenaltyRemaining} />
           ) : isClockRunning ? (
             <ClockRunningBottom />
           ) : isChainBreak ? (
@@ -238,6 +261,14 @@ export function ActivityBox({
           )}
         </div>
       </div>
+
+      {/* Soap-bubbles overlay — covers the entire panel during the
+          cleansing penalty. Each bubble is a CSS-keyframed loop with a
+          staggered delay so they appear and disappear continuously
+          across the 5-second lockout. Lives outside the cross-fade
+          wrapper so the bubbles render at full opacity even when the
+          panel is in mid-cross-fade. */}
+      {shown.isSoapActive && <SoapBubbles />}
     </div>
   );
 }
@@ -336,6 +367,80 @@ function ChainBreakReason({ reason }: { reason: string }) {
       }}
     >
       {reason}
+    </div>
+  );
+}
+
+function SoapPenaltyTop() {
+  return (
+    <div
+      className="pinball-status soap-penalty-top"
+      style={{
+        fontSize: '17px',
+        lineHeight: 1.3,
+        color: 'var(--gapplet-pinball-danger)',
+        fontWeight: 600,
+        textAlign: 'center',
+        padding: '0 6px',
+      }}
+    >
+      <span className="soap-emoji" aria-hidden="true">🧼</span>{' '}
+      Naughty Word - chain broken. 5 second cleansing penalty{' '}
+      <span className="soap-emoji" aria-hidden="true">🧼</span>
+    </div>
+  );
+}
+
+function SoapCountdown({ remaining }: { remaining: number }) {
+  return (
+    <div
+      className="pinball-status soap-countdown"
+      style={{
+        fontSize: '28px',
+        lineHeight: 1.1,
+        color: 'var(--gapplet-pinball-success)',
+        fontWeight: 700,
+        fontFamily: 'monospace',
+        letterSpacing: '0.05em',
+        textAlign: 'center',
+      }}
+    >
+      0:0{Math.max(0, remaining)}
+    </div>
+  );
+}
+
+const SOAP_BUBBLES = [
+  { left: '6%',  top: '18%', size: 14, delay: 0.0 },
+  { left: '14%', top: '62%', size: 22, delay: 0.6 },
+  { left: '24%', top: '32%', size: 16, delay: 1.1 },
+  { left: '32%', top: '78%', size: 12, delay: 0.3 },
+  { left: '40%', top: '15%', size: 20, delay: 0.9 },
+  { left: '48%', top: '55%', size: 26, delay: 0.2 },
+  { left: '56%', top: '25%', size: 14, delay: 1.4 },
+  { left: '62%', top: '70%', size: 18, delay: 0.7 },
+  { left: '70%', top: '20%', size: 22, delay: 1.0 },
+  { left: '78%', top: '60%', size: 16, delay: 0.4 },
+  { left: '86%', top: '35%', size: 20, delay: 1.3 },
+  { left: '92%', top: '75%', size: 14, delay: 0.5 },
+];
+
+function SoapBubbles() {
+  return (
+    <div className="soap-bubbles" aria-hidden="true">
+      {SOAP_BUBBLES.map((b, i) => (
+        <span
+          key={i}
+          className="soap-bubble"
+          style={{
+            left: b.left,
+            top: b.top,
+            width: `${b.size}px`,
+            height: `${b.size}px`,
+            animationDelay: `${b.delay}s`,
+          }}
+        />
+      ))}
     </div>
   );
 }

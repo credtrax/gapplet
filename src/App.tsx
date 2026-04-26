@@ -136,6 +136,14 @@ export function App() {
   // a soap emoji per offense (handled in a follow-up commit).
   const [soapPenalties, setSoapPenalties] = useState(0);
 
+  // Active soap-penalty lockout in seconds. Decremented by the 1 Hz timer
+  // alongside timeLeft / idleSeconds. While > 0, all input is suspended
+  // (drags, taps, tool buttons) and the activity panel renders the
+  // soap-and-bubbles UI with the live countdown. Game timer keeps running
+  // during the lockout — the natural time loss IS the penalty.
+  const [soapPenaltyRemaining, setSoapPenaltyRemaining] = useState(0);
+  const inputBlocked = gameOver || soapPenaltyRemaining > 0;
+
   // Most recent commit's animation payload. ActivityBox keys its
   // children off `id`, so each new event re-mounts the children and
   // re-runs their CSS keyframes. eventIdRef gives us a monotonic ID
@@ -348,6 +356,18 @@ export function App() {
       // Idle counter ticks alongside the clock. Capped at the unlock
       // threshold so the meter doesn't overflow visually.
       setIdleSeconds((s) => Math.min(ELIMINATE_IDLE_SECONDS, s + 1));
+      // Soap-penalty countdown ticks alongside everything else.
+      // When it transitions to 0, restore a clean status message so
+      // the panel cross-fades back to the regular display.
+      setSoapPenaltyRemaining((s) => {
+        if (s <= 0) return 0;
+        const next = s - 1;
+        if (next === 0) {
+          setStatusMessage('Cleansed. Carry on.');
+          setStatusTone('info');
+        }
+        return next;
+      });
     }, 1000);
   }, [stopTimer]);
 
@@ -378,7 +398,7 @@ export function App() {
    *   is unmodified.
    */
   const attemptCommit = (nextBoard: BoardType, opts?: { hint?: Neighbor }) => {
-    if (gameOver) return;
+    if (inputBlocked) return;
     maybeStartClock();
     // Any commit attempt counts as activity, regardless of outcome.
     setIdleSeconds(0);
@@ -394,23 +414,18 @@ export function App() {
     const v = validateBoard(nextBoard);
     if (!v.ok) {
       if (v.blocklisted) {
-        // Soap penalty: chain break + clock penalty + counter for the
-        // share emit. The fancy soap-and-bubbles overlay is deferred to
-        // the animation-polish phase; for now the status message + clock
-        // tick communicate the penalty.
-        const newTime = Math.max(0, timeLeft - SOAP_PENALTY_SECONDS);
-        setTimeLeft(newTime);
+        // Soap penalty: chain breaks AND input is suspended for
+        // SOAP_PENALTY_SECONDS while the countdown runs. The game timer
+        // continues to tick down — the natural time loss during the
+        // lockout IS the penalty (no separate clock deduction).
+        setSoapPenaltyRemaining(SOAP_PENALTY_SECONDS);
         setSoapPenalties((n) => n + 1);
         setChain(CHAIN_START);
         setSelectedIdx(null);
         setStatusMessage(
-          `🧼 Naughty word — chain broken, −${SOAP_PENALTY_SECONDS} seconds. (Wash your mouth out.)`
+          `🧼 Naughty Word - chain broken. ${SOAP_PENALTY_SECONDS} second cleansing penalty 🧼`
         );
         setStatusTone('danger');
-        if (newTime === 0) {
-          stopTimer();
-          setGameOver(true);
-        }
         return;
       }
       setStatusMessage(`${v.reason}. Chain broken.`);
@@ -510,7 +525,7 @@ export function App() {
   const HARD_MODE = false;
 
   const restartChain = () => {
-    if (gameOver) return;
+    if (inputBlocked) return;
     if (HARD_MODE) return;
     if (history[history.length - 1].board.join('') === startSeed) return;
     const seedBoard = startSeed.split('');
@@ -539,7 +554,7 @@ export function App() {
   };
 
   const buyHint = () => {
-    if (gameOver) return;
+    if (inputBlocked) return;
     if (!timerStarted) {
       setStatusMessage('Tap a cell or drag a tile first to start the clock.');
       setStatusTone('info');
@@ -566,7 +581,7 @@ export function App() {
   };
 
   const eliminateUseless = () => {
-    if (gameOver) return;
+    if (inputBlocked) return;
     if (eliminateActive) return; // already active — wait for next commit
     if (idleSeconds < ELIMINATE_IDLE_SECONDS) {
       const wait = ELIMINATE_IDLE_SECONDS - idleSeconds;
@@ -589,7 +604,7 @@ export function App() {
   // ------------------------------------------------------------------
 
   const handleDrop = (source: DragSource, target: DropTarget | null) => {
-    if (gameOver) return;
+    if (inputBlocked) return;
     if (target == null) return;
     const prev = history[history.length - 1].board;
 
@@ -665,11 +680,11 @@ export function App() {
   // Tool button labels
   // ------------------------------------------------------------------
 
-  const hintButtonDisabled = gameOver || hintsAvailable <= 0;
+  const hintButtonDisabled = inputBlocked || hintsAvailable <= 0;
   const hintLabel = hintsAvailable > 0 ? `Buy Guess (${hintsAvailable})` : 'Buy Guess';
 
   const eliminateButtonDisabled =
-    gameOver || eliminateActive || idleSeconds < ELIMINATE_IDLE_SECONDS;
+    inputBlocked || eliminateActive || idleSeconds < ELIMINATE_IDLE_SECONDS;
   const eliminateLabel = eliminateActive
     ? 'Active'
     : idleSeconds >= ELIMINATE_IDLE_SECONDS
@@ -753,7 +768,7 @@ export function App() {
           selectedIdx={selectedIdx}
           idle={!timerStarted && !gameOver}
           onCellClick={(i) => {
-            if (gameOver) return;
+            if (inputBlocked) return;
             setSelectedIdx(i);
             maybeStartClock();
           }}
@@ -765,6 +780,7 @@ export function App() {
           tone={statusTone}
           isReady={!timerStarted && !gameOver}
           timeLeft={timeLeft}
+          soapPenaltyRemaining={soapPenaltyRemaining}
           readyTopLine={
             session
               ? profile?.display_name
@@ -776,7 +792,7 @@ export function App() {
 
         <VirtualKeyboard
           onLetterKey={(letter) => {
-            if (gameOver) return;
+            if (inputBlocked) return;
             if (disabledLetters.has(letter)) return;
             if (selectedIdx == null) {
               setStatusMessage('Tap a cell first, or drag the letter onto a cell.');
@@ -788,7 +804,7 @@ export function App() {
             attemptCommit(next);
           }}
           onBackspace={() => {
-            if (gameOver) return;
+            if (inputBlocked) return;
             if (selectedIdx == null) {
               setStatusMessage('Tap a cell first, or drag ⌫ onto the cell to remove.');
               setStatusTone('info');
@@ -797,7 +813,7 @@ export function App() {
             handleDrop({ kind: 'backspace' }, { kind: 'cell', idx: selectedIdx });
           }}
           onSpace={() => {
-            if (gameOver) return;
+            if (inputBlocked) return;
             if (selectedIdx == null) {
               setStatusMessage('Tap a cell first, or drag Space onto the cell.');
               setStatusTone('info');
@@ -808,11 +824,11 @@ export function App() {
           onRestartChain={restartChain}
           onBuyHint={buyHint}
           onEliminate={eliminateUseless}
-          letterKeyDisabled={gameOver}
-          backspaceDisabled={gameOver}
-          spaceDisabled={gameOver}
+          letterKeyDisabled={inputBlocked}
+          backspaceDisabled={inputBlocked}
+          spaceDisabled={inputBlocked}
           restartChainDisabled={
-            gameOver || HARD_MODE ||
+            inputBlocked || HARD_MODE ||
             history[history.length - 1].board.join('') === startSeed
           }
           hintDisabled={hintButtonDisabled}
