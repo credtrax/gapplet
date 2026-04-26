@@ -269,18 +269,20 @@
  * -------------------------------------------------------------------- */
 
 @keyframes gapplet-celebration {
+  /* 2.4s total: 0–6% fast fade-in (~0.14s), 6–14% scale settle, 14–87%
+   * hold at full opacity (~2s), 87–100% fade-out (~0.3s). */
   0% {
     opacity: 0;
-    transform: translateY(8px) scale(0.92);
+    transform: translateY(8px) scale(0.9);
   }
-  12% {
+  6% {
     opacity: 1;
-    transform: translateY(0) scale(1.06);
+    transform: translateY(0) scale(1.1);
   }
-  22% {
+  14% {
     transform: translateY(0) scale(1);
   }
-  72% {
+  87% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
@@ -291,15 +293,15 @@
 }
 
 .pinball-celebration {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 700;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--gapplet-pinball-hint);
-  text-shadow: 0 0 8px currentColor, 0 0 18px currentColor;
+  text-shadow: 0 0 10px currentColor, 0 0 22px currentColor;
   letter-spacing: 0.03em;
   text-align: center;
   white-space: nowrap;
-  animation: gapplet-celebration 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  animation: gapplet-celebration 2.4s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
 
 /* Stopwatch emojis flanking the game-over message ("Time! ..."). Subtle
