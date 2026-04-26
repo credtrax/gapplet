@@ -92,6 +92,14 @@
     inset 0 -2px 0 var(--gapplet-tile-bevel);
   /* Dashed effect we lose with pure shadows — accept a static flat ring. */
 }
+.gapplet-tile[data-state='drag-target'] {
+  box-shadow:
+    0 0 0 3px var(--gapplet-success),
+    0 0 12px 2px rgba(5, 150, 105, 0.5),
+    0 2px 5px var(--gapplet-tile-drop),
+    inset 0 1.5px 0 var(--gapplet-tile-highlight),
+    inset 0 -2px 0 var(--gapplet-tile-bevel);
+}
 
 /* ----------------------------------------------------------------------
  * Dirty-cell pulse — yellow ring that throbs to signal uncommitted edits.

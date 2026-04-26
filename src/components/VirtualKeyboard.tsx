@@ -1,41 +1,31 @@
+import { useDrag, type DragSource } from '../lib/drag';
+
 type VirtualKeyboardProps = {
-  /** Called when a letter key is tapped. Receives the uppercase letter. */
-  onLetterKey: (letter: string) => void;
-  /** Called when Enter is tapped. Same semantics as physical Enter — submits. */
-  onEnter: () => void;
   /**
-   * Called when the ⌫ key is tapped. Gapplet's Remove semantics (shift
-   * right-of-selection left), not Wordle's "delete last letter."
+   * Called when a letter key is tapped (the click fallback path). Receives
+   * the uppercase letter. The drag path bypasses this — it goes straight to
+   * the DragProvider's onDrop.
    */
+  onLetterKey: (letter: string) => void;
+  /** Tap fallback: ⌫ acts on the selected cell. */
   onBackspace: () => void;
-  /** Called when the Space bar is tapped. Toggles selected cell to space. */
+  /** Tap fallback: Space acts on the selected cell. */
   onSpace: () => void;
   /**
-   * Called when "Restart Chain" (left top) is tapped. Returns the board
-   * to the seed and resets the chain multiplier. Button-only — no
-   * physical keyboard shortcut, by design (bigger commitment).
+   * Called when "Restart Chain" is tapped. Returns the board to the seed
+   * and resets the chain multiplier.
    */
   onRestartChain: () => void;
-  /**
-   * Called when "Revert (Esc)" (right top) is tapped. Undoes any
-   * uncommitted edits, putting the board back to the last committed
-   * state. Chain unchanged. Mirrors physical Esc.
-   */
-  onRevert: () => void;
   /** Called when the "Buy Guess" key is tapped. Same as the hint system. */
   onBuyHint: () => void;
-  /** Letter keys are disabled while no board cell is selected. */
   letterKeyDisabled: boolean;
-  enterDisabled: boolean;
   backspaceDisabled: boolean;
   spaceDisabled: boolean;
   restartChainDisabled: boolean;
-  revertDisabled: boolean;
   hintDisabled: boolean;
   /**
    * Label for the Buy Guess button. Includes a live mm:ss countdown when
    * the minute-1 hint has been used and minute-2 hasn't unlocked yet.
-   * App owns the label since it depends on timeLeft + hintsByWindow.
    */
   hintLabel: string;
 };
@@ -55,8 +45,10 @@ const LETTER_KEY_STYLE: React.CSSProperties = {
   fontSize: '16px',
   fontWeight: 500,
   color: 'var(--gapplet-fg)',
-  cursor: 'pointer',
-  touchAction: 'manipulation',
+  cursor: 'grab',
+  // touchAction: 'none' lets pointer-drag work on touch without the browser
+  // treating it as a scroll gesture. Critical for mobile drag.
+  touchAction: 'none',
   userSelect: 'none',
 };
 
@@ -86,6 +78,7 @@ const SPACE_KEY_STYLE: React.CSSProperties = {
   fontWeight: 600,
 };
 
+// Top-row actions don't drag — they act on game state, not on a cell.
 const TOP_ACTION_KEY_STYLE: React.CSSProperties = {
   ...LETTER_KEY_STYLE,
   flex: 1,
@@ -94,43 +87,46 @@ const TOP_ACTION_KEY_STYLE: React.CSSProperties = {
   letterSpacing: '0.04em',
   fontWeight: 600,
   minHeight: '42px',
+  cursor: 'pointer',
+  touchAction: 'manipulation',
 };
 
 /**
- * Mobile-first on-screen keyboard.
+ * Mobile-first on-screen keyboard, drag-input variant.
  *
  * Layout (top to bottom):
- *   [Revert (Esc)] [Restart Chain (1)] [Buy Guess (=)]   row 0: three top actions
- *   Q W E R T Y U I O P                                   row 1
- *   A S D F G H J K L                                     row 2 (slight inset)
- *   [Enter] Z X C V B N M [⌫]                             row 3
- *   [               Space               ]                 row 4 (full width)
+ *   [Restart Chain] [Buy Guess]                   row 0: two top actions
+ *   Q W E R T Y U I O P                           row 1
+ *   A S D F G H J K L                             row 2 (slight inset)
+ *   Z X C V B N M [⌫]                             row 3
+ *   [               Space               ]         row 4 (full width)
  *
- * Top row actions (UX-ordered by reversibility):
- *   - Revert (Esc): undo uncommitted edits only (most reversible, leftmost).
- *   - Restart Chain (1): back to seed word, chain resets (bigger commitment).
- *   - Buy Guess (=): consume a hint (costs a letter value + freezes chain).
+ * Letter / Space / Backspace tiles are draggable: pointerdown anywhere on
+ * the tile starts a drag, and dropping on a board cell commits the move.
+ * A tap (release without crossing the drag threshold) falls through to
+ * the click handler — same effect, but only works after a cell is
+ * selected. Restart Chain and Buy Guess are click-only; they don't act
+ * on a target cell.
  *
- * Each has a physical-keyboard shortcut in parentheses. Mobile users tap
- * the button; desktop users can use the shortcut or the button.
+ * Enter and Revert keys removed in the drag-input experiment: there's no
+ * dirty intermediate state to confirm or revert. Hardware keyboard input
+ * is also disabled.
  */
 export function VirtualKeyboard({
   onLetterKey,
-  onEnter,
   onBackspace,
   onSpace,
   onRestartChain,
-  onRevert,
   onBuyHint,
   letterKeyDisabled,
-  enterDisabled,
   backspaceDisabled,
   spaceDisabled,
   restartChainDisabled,
-  revertDisabled,
   hintDisabled,
   hintLabel,
 }: VirtualKeyboardProps) {
+  const { startDrag } = useDrag();
+
   return (
     <div
       style={{
@@ -146,28 +142,19 @@ export function VirtualKeyboard({
     >
       <div style={{ display: 'flex', gap: '5px' }}>
         <button
-          onClick={onRevert}
-          disabled={revertDisabled}
-          style={TOP_ACTION_KEY_STYLE}
-          aria-label="Revert to the last committed word (Esc key)"
-          title="Undo any uncommitted edits and return to the last successfully-submitted word. Chain and score unchanged."
-        >
-          Revert (Esc)
-        </button>
-        <button
           onClick={onRestartChain}
           disabled={restartChainDisabled}
           style={TOP_ACTION_KEY_STYLE}
-          aria-label="Restart chain — back to the seed word, chain resets (1 key)"
+          aria-label="Restart chain — back to the seed word, chain resets"
           title="Return to the seed word. Chain resets to ×1.0. Previous path stays blocked. Disabled in hard mode."
         >
-          Restart Chain (1)
+          Restart Chain
         </button>
         <button
           onClick={onBuyHint}
           disabled={hintDisabled}
           style={TOP_ACTION_KEY_STYLE}
-          aria-label={`Buy Guess — ${hintLabel} (= key)`}
+          aria-label={`Buy Guess — ${hintLabel}`}
           title="Buy a hint. One per minute of play, no stacking. Chain does not advance on hinted moves; cost equals the placed letter's value."
         >
           {hintLabel}
@@ -175,41 +162,53 @@ export function VirtualKeyboard({
       </div>
       <div style={{ display: 'flex', gap: '5px' }}>
         {ROW1.map((l) => (
-          <LetterKey key={l} letter={l} onClick={() => onLetterKey(l)} disabled={letterKeyDisabled} />
+          <DraggableLetterKey
+            key={l}
+            letter={l}
+            disabled={letterKeyDisabled}
+            onTap={() => onLetterKey(l)}
+            startDrag={startDrag}
+          />
         ))}
       </div>
       <div style={{ display: 'flex', gap: '5px', padding: '0 5%' }}>
         {ROW2.map((l) => (
-          <LetterKey key={l} letter={l} onClick={() => onLetterKey(l)} disabled={letterKeyDisabled} />
+          <DraggableLetterKey
+            key={l}
+            letter={l}
+            disabled={letterKeyDisabled}
+            onTap={() => onLetterKey(l)}
+            startDrag={startDrag}
+          />
         ))}
       </div>
       <div style={{ display: 'flex', gap: '5px' }}>
-        <button
-          onClick={onEnter}
-          disabled={enterDisabled}
-          style={ACTION_KEY_STYLE}
-          aria-label="Submit move"
-        >
-          Enter
-        </button>
         {ROW3_LETTERS.map((l) => (
-          <LetterKey key={l} letter={l} onClick={() => onLetterKey(l)} disabled={letterKeyDisabled} />
+          <DraggableLetterKey
+            key={l}
+            letter={l}
+            disabled={letterKeyDisabled}
+            onTap={() => onLetterKey(l)}
+            startDrag={startDrag}
+          />
         ))}
         <button
+          onPointerDown={(e) => !backspaceDisabled && startDrag({ kind: 'backspace' }, e)}
           onClick={onBackspace}
           disabled={backspaceDisabled}
           style={BACKSPACE_KEY_STYLE}
-          aria-label="Remove letter"
+          aria-label="Remove letter (drag onto a cell, or tap with a cell selected)"
         >
           ⌫
         </button>
       </div>
       <div style={{ display: 'flex', gap: '5px' }}>
         <button
+          onPointerDown={(e) => !spaceDisabled && startDrag({ kind: 'space' }, e)}
           onClick={onSpace}
           disabled={spaceDisabled}
           style={SPACE_KEY_STYLE}
-          aria-label="Insert space"
+          aria-label="Insert space (drag onto a cell, or tap with a cell selected)"
         >
           Space
         </button>
@@ -218,18 +217,21 @@ export function VirtualKeyboard({
   );
 }
 
-function LetterKey({
+function DraggableLetterKey({
   letter,
-  onClick,
   disabled,
+  onTap,
+  startDrag,
 }: {
   letter: string;
-  onClick: () => void;
   disabled: boolean;
+  onTap: () => void;
+  startDrag: (source: DragSource, e: React.PointerEvent) => void;
 }) {
   return (
     <button
-      onClick={onClick}
+      onPointerDown={(e) => !disabled && startDrag({ kind: 'letter', letter }, e)}
+      onClick={onTap}
       disabled={disabled}
       style={LETTER_KEY_STYLE}
       aria-label={`Letter ${letter}`}

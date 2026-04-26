@@ -1,41 +1,38 @@
 import { LETTER_VALUES, SPACE } from '../lib/letterValues';
+import { useDrag, DROP_TARGET_ATTR } from '../lib/drag';
 
 type BoardProps = {
-  /** Current 5-cell board state */
+  /** Current 5-cell board state (always the last committed state in drag-input mode). */
   board: readonly string[];
-  /** Last successfully-submitted board; used to detect uncommitted edits */
-  lastCommittedBoard: readonly string[];
-  /** Which cell is currently selected (null if none) */
+  /** Which cell is currently selected (null if none). Used by tap-fallback to know where letters go. */
   selectedIdx: number | null;
-  /** If a hint is pending, this is the cell that was auto-filled */
-  hintedIdx: number | null;
   /** True before the player's first interaction — styled as "ready" */
   idle: boolean;
-  /** Called when a cell is clicked */
+  /** Called when a cell is clicked (tap path; drag path is handled separately). */
   onCellClick: (idx: number) => void;
 };
 
 /**
- * The 5-cell board. Stateless — all visual state comes from props.
+ * The 5-cell board.
  *
- * Each cell shows the letter (or a space glyph if empty) and the Scrabble
- * value in the bottom-right corner. The border + glow style encode five states,
- * priority high-to-low:
- *   - hinted:   amber (the "Buy a guess" suggestion) — takes precedence even
- *               though hinted cells are technically also dirty.
- *   - dirty:    yellow + pulsing glow (change proposed, awaiting Enter).
- *   - selected: blue (player clicked this cell, not yet changed).
- *   - idle:     dashed (game is ready but clock hasn't started).
- *   - normal:   thin gray.
+ * Each cell is both a drop target (data-drop-target-idx={i}, picked up by
+ * the drag system via elementFromPoint) and a drag source (pointerdown
+ * on a letter cell starts a board-cell drag for the swap mechanic).
+ * Empty cells aren't drag sources — there's nothing to pick up.
+ *
+ * Cell border states, priority high-to-low:
+ *   - drag-target:   green ring (a drag is active and this is the
+ *                    cell under the pointer).
+ *   - drag-source:   the source cell of the active drag goes
+ *                    semi-transparent so the user sees the letter
+ *                    "lifting off" into the ghost.
+ *   - selected:      blue (player tapped this cell — tap-fallback path).
+ *   - idle:          dashed (game is ready but clock hasn't started).
+ *   - normal:        thin gray.
  */
-export function Board({
-  board,
-  lastCommittedBoard,
-  selectedIdx,
-  hintedIdx,
-  idle,
-  onCellClick,
-}: BoardProps) {
+export function Board({ board, selectedIdx, idle, onCellClick }: BoardProps) {
+  const { state: dragState, startDrag } = useDrag();
+
   return (
     <div
       className="grid grid-cols-5 gap-2.5 my-5"
@@ -46,21 +43,24 @@ export function Board({
       {board.map((ch, i) => {
         const isSpace = ch === SPACE;
         const isSelected = i === selectedIdx;
-        const isHinted = i === hintedIdx;
-        const isDirty = !isHinted && board[i] !== lastCommittedBoard[i];
+        const isDragTarget = dragState.active != null && dragState.hoverTargetIdx === i;
+        const isDragSource =
+          dragState.active?.kind === 'board-cell' && dragState.active.idx === i;
 
-        // Priority order: hinted > dirty > selected > idle > (none).
-        // Dirty uses the pulse class; others use data-state for a
-        // static ring. Empty cells use the recessed variant.
         const classes = ['gapplet-tile'];
         if (isSpace) classes.push('gapplet-tile--empty');
-        if (isDirty) classes.push('gapplet-dirty-cell');
 
         let stateAttr: string | undefined;
-        if (isHinted) stateAttr = 'hinted';
-        else if (isDirty) stateAttr = undefined; // pulse class handles ring
+        if (isDragTarget) stateAttr = 'drag-target';
         else if (isSelected) stateAttr = 'selected';
         else if (idle) stateAttr = 'idle';
+
+        // pointerdown on a letter cell starts a board-cell drag (the swap
+        // mechanic). Empty cells skip this — there's nothing to lift off.
+        const onPointerDown = (e: React.PointerEvent) => {
+          if (isSpace) return;
+          startDrag({ kind: 'board-cell', idx: i, letter: ch }, e);
+        };
 
         return (
           <button
@@ -69,8 +69,10 @@ export function Board({
             aria-label={isSpace ? `Cell ${i + 1}, empty` : `Cell ${i + 1}, letter ${ch}`}
             aria-selected={isSelected}
             onClick={() => onCellClick(i)}
+            onPointerDown={onPointerDown}
             className={classes.join(' ')}
             data-state={stateAttr}
+            {...{ [DROP_TARGET_ATTR]: i }}
             style={{
               height: '110px',
               borderRadius: '8px',
@@ -78,9 +80,12 @@ export function Board({
               fontWeight: 700,
               fontFamily: 'Georgia, "Times New Roman", serif',
               position: 'relative',
-              cursor: 'pointer',
+              cursor: isSpace ? 'pointer' : 'grab',
               userSelect: 'none',
               padding: 0,
+              touchAction: 'none',
+              opacity: isDragSource ? 0.3 : 1,
+              transition: 'opacity 0.1s ease-out',
             }}
           >
             {isSpace ? (
