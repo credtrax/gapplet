@@ -72,9 +72,17 @@ const POINTS_PER_HINT = 100;
 const ELIMINATE_IDLE_SECONDS = 10;
 
 /** Moves scoring at least this many points award a clock bonus. */
-const TIME_BONUS_THRESHOLD = 15;
+const TIME_BONUS_THRESHOLD = 14;
 /** Seconds added to the clock for each qualifying move. */
 const TIME_BONUS_SECONDS = 2;
+
+/** Format an integer seconds count as M:SS (zero-padded seconds).
+ * Used for the "0:02" clock-bonus indicator in messages and celebrations. */
+function fmtBonus(s: number): string {
+  const mm = Math.floor(s / 60);
+  const ss = (s % 60).toString().padStart(2, '0');
+  return `${mm}:${ss}`;
+}
 
 /** Clock seconds deducted when a player attempts a blocklisted word. */
 const SOAP_PENALTY_SECONDS = 5;
@@ -453,7 +461,7 @@ export function App() {
     if (timeBonus > 0) {
       setTimeLeft((t) => t + timeBonus);
     }
-    setStatusMessage(timeBonus > 0 ? `${messageBase}  +${timeBonus}s!` : messageBase);
+    setStatusMessage(timeBonus > 0 ? `${messageBase}  ${fmtBonus(timeBonus)}!` : messageBase);
     setStatusTone(tone);
 
     // Charge-earned detection: did this commit push the score across the

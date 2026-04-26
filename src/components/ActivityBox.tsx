@@ -90,7 +90,11 @@ function celebrationText(event: ActivityEvent | null): string {
   const parts: string[] = [`+${event.earned}`];
   if (event.isStar) parts.push('★');
   if (event.isHint) parts.push('hint');
-  if (event.timeBonus > 0) parts.push(`+${event.timeBonus}s`);
+  if (event.timeBonus > 0) {
+    const mm = Math.floor(event.timeBonus / 60);
+    const ss = (event.timeBonus % 60).toString().padStart(2, '0');
+    parts.push(`${mm}:${ss}`);
+  }
   if (event.chargeEarned) parts.push('+1 hint earned');
   return parts.join(' · ');
 }

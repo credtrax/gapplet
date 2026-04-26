@@ -165,7 +165,7 @@ const SLIDES: Slide[] = [
     title: 'Big plays earn time',
     body: (
       <>
-        Any move scoring <strong>15+ points</strong> (after the multiplier) adds{' '}
+        Any move scoring <strong>14+ points</strong> (after the multiplier) adds{' '}
         <strong>+2 seconds</strong> to your clock.{' '}
         <span style={{ fontSize: '16px' }}>🧼</span> Naughty words break your
         chain <em>and</em> cost <strong>5 seconds</strong>. Play nice.
