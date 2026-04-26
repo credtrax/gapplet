@@ -756,6 +756,7 @@ export function App() {
           statusMessage={statusMessage}
           tone={statusTone}
           isReady={!timerStarted && !gameOver}
+          timeLeft={timeLeft}
           readyTopLine={
             session
               ? profile?.display_name

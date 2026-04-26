@@ -26,6 +26,8 @@ type Scenario = {
   event: Omit<ActivityEvent, 'id'> | null;
   /** Optional override for the ready-state top line. */
   readyTopLine?: string;
+  /** Sample seconds remaining; only matters for the clock-running display. */
+  timeLeft?: number;
 };
 
 const SCENARIOS: Scenario[] = [
@@ -64,6 +66,7 @@ const SCENARIOS: Scenario[] = [
     tone: null,
     isReady: false,
     event: null,
+    timeLeft: 110,
   },
 
   // --- Successful moves ---
@@ -303,6 +306,7 @@ export function PinballSimulator() {
         tone={current.tone}
         isReady={current.isReady}
         readyTopLine={current.readyTopLine}
+        timeLeft={current.timeLeft}
       />
 
       <div

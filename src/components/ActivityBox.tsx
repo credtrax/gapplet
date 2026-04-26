@@ -50,6 +50,10 @@ type Props = {
    * generic "Ready for you to start". App swaps in a sign-in nudge
    * when the player isn't authenticated. */
   readyTopLine?: string;
+  /** Seconds remaining on the clock. Drives the live countdown shown in
+   * the "Clock running" two-line display. Updates re-render the
+   * countdown text directly — no cross-fade per tick. */
+  timeLeft?: number;
 };
 
 function pinballColor(tone: StatusTone): string {
@@ -66,6 +70,14 @@ const FADE_MS = 350;
 
 const DEFAULT_READY_TOP_LINE = 'Ready for you to start';
 const READY_MARQUEE_LINE = 'Drag a tile or tap a cell to start.';
+const CLOCK_RUNNING_BOTTOM_LINE = 'Drag a tile onto the board';
+
+/** Format seconds → "MM:SS". */
+function fmtClock(s: number): string {
+  const mm = Math.floor(s / 60).toString().padStart(2, '0');
+  const ss = (s % 60).toString().padStart(2, '0');
+  return `${mm}:${ss}`;
+}
 
 /**
  * Build the top-line celebration string for a commit. Returns '' for
@@ -97,6 +109,7 @@ export function ActivityBox({
   tone,
   isReady,
   readyTopLine = DEFAULT_READY_TOP_LINE,
+  timeLeft,
 }: Props) {
   const [shown, setShown] = useState<ShownState>({
     msg: statusMessage,
@@ -131,7 +144,8 @@ export function ActivityBox({
     shown.readyTopLine,
   ]);
 
-  const cel = !shown.isReady ? celebrationText(event) : '';
+  const isClockRunning = !shown.isReady && shown.msg.startsWith('Clock running');
+  const cel = !shown.isReady && !isClockRunning ? celebrationText(event) : '';
 
   return (
     <div
@@ -180,6 +194,8 @@ export function ActivityBox({
             >
               {shown.readyTopLine}
             </div>
+          ) : isClockRunning ? (
+            <ClockRunningTop timeLeft={timeLeft ?? 0} />
           ) : (
             event && cel && (
               <div key={`cel-${event.id}`} className="pinball-celebration">
@@ -201,11 +217,52 @@ export function ActivityBox({
         >
           {shown.isReady ? (
             <Marquee text={READY_MARQUEE_LINE} />
+          ) : isClockRunning ? (
+            <ClockRunningBottom />
           ) : (
             <PlayingStatus msg={shown.msg} tone={shown.tone} />
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ClockRunningTop({ timeLeft }: { timeLeft: number }) {
+  return (
+    <div
+      className="pinball-status"
+      style={{
+        fontSize: '19px',
+        lineHeight: 1.2,
+        color: 'var(--gapplet-pinball-accent)',
+        fontWeight: 600,
+        textAlign: 'center',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '12px',
+      }}
+    >
+      <span className="time-emoji" aria-hidden="true">⏱️</span>
+      <span>Clock Running &nbsp; {fmtClock(timeLeft)} remaining</span>
+      <span className="time-emoji" aria-hidden="true">⏱️</span>
+    </div>
+  );
+}
+
+function ClockRunningBottom() {
+  return (
+    <div
+      className="pinball-status"
+      style={{
+        fontSize: '19px',
+        lineHeight: 1.2,
+        color: 'var(--gapplet-pinball-muted)',
+        fontWeight: 500,
+        textAlign: 'center',
+      }}
+    >
+      {CLOCK_RUNNING_BOTTOM_LINE}
     </div>
   );
 }
