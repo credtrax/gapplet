@@ -47,32 +47,6 @@ const LETTER_KEY_STYLE: React.CSSProperties = {
   userSelect: 'none',
 };
 
-const ACTION_KEY_STYLE: React.CSSProperties = {
-  ...LETTER_KEY_STYLE,
-  flex: 1.5,
-  fontSize: '11px',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  fontWeight: 600,
-};
-
-const BACKSPACE_KEY_STYLE: React.CSSProperties = {
-  ...ACTION_KEY_STYLE,
-  fontSize: '22px',
-  fontWeight: 400,
-  letterSpacing: 'normal',
-  textTransform: 'none',
-};
-
-const SPACE_KEY_STYLE: React.CSSProperties = {
-  ...LETTER_KEY_STYLE,
-  flex: 1,
-  fontSize: '13px',
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  fontWeight: 600,
-};
-
 // Top-row tool buttons. Click-only (they act on game state, not on a cell).
 // Position: relative so the absolute-positioned meter lands at the bottom.
 const TOOL_KEY_STYLE: React.CSSProperties = {
@@ -154,6 +128,7 @@ export function VirtualKeyboard({
           title="Return to the seed word. Chain resets to ×1.0. Previous path stays blocked."
         >
           Restart Chain
+          <ToolMeter percent={100} kind="restart" />
         </button>
         <button
           onClick={onBuyHint}
@@ -212,24 +187,88 @@ export function VirtualKeyboard({
           />
         ))}
         <button
+          className="gapplet-tile"
           onPointerDown={(e) => !backspaceDisabled && startDrag({ kind: 'backspace' }, e)}
           onClick={onBackspace}
           disabled={backspaceDisabled}
-          style={BACKSPACE_KEY_STYLE}
-          aria-label="Remove letter (drag onto a cell, or tap with a cell selected)"
+          style={{
+            flex: 1.5,
+            minWidth: '28px',
+            minHeight: '52px',
+            padding: 0,
+            borderRadius: '5px',
+            fontSize: '26px',
+            fontWeight: 500,
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            color: 'var(--gapplet-tile-fg)',
+            cursor: 'grab',
+            touchAction: 'none',
+            userSelect: 'none',
+            position: 'relative',
+          }}
+          aria-label="Remove letter, 0 points (drag onto a cell, or tap with a cell selected)"
         >
           ⌫
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              bottom: '3px',
+              right: '5px',
+              fontSize: '10px',
+              fontWeight: 600,
+              fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+              color: 'var(--gapplet-tile-fg)',
+              opacity: 0.7,
+            }}
+          >
+            0
+          </span>
         </button>
       </div>
       <div style={{ display: 'flex', gap: '5px' }}>
         <button
+          className="gapplet-tile"
           onPointerDown={(e) => !spaceDisabled && startDrag({ kind: 'space' }, e)}
           onClick={onSpace}
           disabled={spaceDisabled}
-          style={SPACE_KEY_STYLE}
-          aria-label="Insert space (drag onto a cell, or tap with a cell selected)"
+          style={{
+            flex: 1,
+            minWidth: '28px',
+            minHeight: '52px',
+            padding: 0,
+            borderRadius: '5px',
+            fontSize: '15px',
+            fontWeight: 700,
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            textTransform: 'uppercase',
+            letterSpacing: '0.12em',
+            color: 'var(--gapplet-tile-fg)',
+            cursor: 'grab',
+            touchAction: 'none',
+            userSelect: 'none',
+            position: 'relative',
+          }}
+          aria-label="Insert space, 0 points (drag onto a cell, or tap with a cell selected)"
         >
           Space
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              bottom: '3px',
+              right: '7px',
+              fontSize: '10px',
+              fontWeight: 600,
+              fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+              color: 'var(--gapplet-tile-fg)',
+              opacity: 0.7,
+              textTransform: 'none',
+              letterSpacing: 'normal',
+            }}
+          >
+            0
+          </span>
         </button>
       </div>
     </div>
@@ -239,12 +278,26 @@ export function VirtualKeyboard({
 /**
  * Thin progress bar pinned to the bottom edge of a tool button. Width is
  * driven by the percent prop; the CSS transition smooths small per-move
- * deltas. The colour key matches the tool: amber for the hint meter
- * (echoes the Buy Guess hint amber), green for eliminate (echoes the
- * drag-target highlight).
+ * deltas. The colour key matches the tool:
+ *   restart  → accent blue (always 100% — Restart Chain is always
+ *              available, the bar is purely a visual rhyme with the
+ *              other two tools)
+ *   hint     → amber (echoes the Buy Guess hint amber)
+ *   eliminate→ green (echoes the drag-target highlight)
  */
-function ToolMeter({ percent, kind }: { percent: number; kind: 'hint' | 'eliminate' }) {
-  const color = kind === 'hint' ? 'var(--gapplet-hint)' : 'var(--gapplet-success)';
+function ToolMeter({
+  percent,
+  kind,
+}: {
+  percent: number;
+  kind: 'hint' | 'eliminate' | 'restart';
+}) {
+  const color =
+    kind === 'hint'
+      ? 'var(--gapplet-hint)'
+      : kind === 'eliminate'
+      ? 'var(--gapplet-success)'
+      : 'var(--gapplet-accent)';
   return (
     <span
       aria-hidden="true"
