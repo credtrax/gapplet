@@ -1,11 +1,16 @@
+import { useEffect, useState } from 'react';
+
 /**
  * ActivityBox — the pinball-display panel under the board.
  *
- * Dark recessed frame with LED-glow text. Top line is the live status
- * message in a tone-mapped bright color; bottom line is the animation
- * surface — score popups, time-bonus badges, and charge-earned
- * celebrations. Each animation is keyed off event.id so React
- * re-mounts and re-runs CSS keyframes on every new commit.
+ * Two regions stacked vertically inside a dark recessed frame:
+ *   - Top ~1/3:    quiet space (reserved for future content; today empty).
+ *   - Bottom ~2/3: the active surface. The status message sits centered
+ *                  here and cross-fades on every change (fade out the old
+ *                  message → swap content → fade in the new). Animation
+ *                  overlays (score popup, time-bonus badge, charge-
+ *                  earned celebration) layer absolutely on top of this
+ *                  same region so they share the visual real estate.
  */
 
 export type ActivityEvent = {
@@ -33,8 +38,7 @@ type Props = {
   tone: StatusTone;
 };
 
-/** Map App's logical tone to the pinball-bright palette. Returns a CSS
- * variable so palette tweaks live in index.css. */
+/** Map App's logical tone to the pinball-bright palette. */
 function pinballColor(tone: StatusTone): string {
   switch (tone) {
     case 'success': return 'var(--gapplet-pinball-success)';
@@ -45,42 +49,95 @@ function pinballColor(tone: StatusTone): string {
   }
 }
 
+const FADE_MS = 350;
+
 export function ActivityBox({ event, statusMessage, tone }: Props) {
+  // Cross-fade pipeline: when statusMessage or tone changes, fade out
+  // the currently-visible text, swap to the new content, fade in.
+  // shown.visible drives a CSS opacity transition on the same div, so
+  // the swap happens while opacity is at 0 — no flash.
+  const [shown, setShown] = useState<{ msg: string; tone: StatusTone; visible: boolean }>(
+    { msg: statusMessage, tone, visible: true }
+  );
+
+  useEffect(() => {
+    if (statusMessage === shown.msg && tone === shown.tone) return;
+    setShown((s) => ({ ...s, visible: false }));
+    const t = setTimeout(() => {
+      setShown({ msg: statusMessage, tone, visible: true });
+    }, FADE_MS);
+    return () => clearTimeout(t);
+  }, [statusMessage, tone, shown.msg, shown.tone]);
+
   return (
     <div
       className="gapplet-pinball"
       style={{
-        minHeight: '70px',
+        minHeight: '88px',
         margin: '8px 0 1rem',
-        padding: '10px 16px',
+        padding: '0 16px',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
         position: 'relative',
-        // Score popups float up out of the panel into the board's airspace.
         overflow: 'visible',
       }}
     >
-      <div
-        className="pinball-status"
-        style={{
-          fontSize: '14px',
-          color: pinballColor(tone),
-          fontWeight: tone === 'info' || tone === 'warning' ? 600 : 500,
-          minHeight: '20px',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        {statusMessage}
-      </div>
+      {/* Top region — quiet space. Currently empty; reserved for future
+          content (e.g., chain multiplier readout, brand strip, etc.). */}
       <div
         aria-hidden="true"
+        style={{ flex: '0 0 26px' }}
+      />
+
+      {/* Bottom region — the active 2/3. Status text cross-fades here;
+          animation overlays layer absolutely on top. */}
+      <div
         style={{
-          minHeight: '28px',
+          flex: '1 1 auto',
           position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingBottom: '12px',
         }}
       >
+        <div
+          style={{
+            opacity: shown.visible ? 1 : 0,
+            transition: `opacity ${FADE_MS}ms ease-out`,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '6px',
+            position: 'relative',
+            zIndex: 1,
+          }}
+        >
+          <div
+            className="pinball-status"
+            style={{
+              fontSize: '19px',
+              lineHeight: 1.3,
+              color: pinballColor(shown.tone),
+              fontWeight: shown.tone === 'info' || shown.tone === 'warning' ? 600 : 500,
+              textAlign: 'center',
+            }}
+          >
+            {shown.msg}
+          </div>
+          {/* Broken-chain icon: shows on any chain-break (tone='danger')
+              that isn't a soap penalty (those carry their own 🧼 already). */}
+          {shown.tone === 'danger' && !shown.msg.startsWith('🧼') && (
+            <div
+              key={`bc-${shown.msg}`}
+              className="broken-chain-icon"
+              aria-hidden="true"
+            >
+              ⛓️‍💥
+            </div>
+          )}
+        </div>
+
         {event && event.earned > 0 && (
           <ScorePopup
             key={`score-${event.id}`}
