@@ -180,8 +180,10 @@ export function useDrag(): DragContextValue {
 /**
  * Floating tile that follows the pointer during an active drag. Sized to
  * roughly match a board cell so the user sees the drop preview at the
- * right scale. position: fixed + viewport-coordinate left/top + a 50/50
- * translate centers the tile under the pointer.
+ * right scale. The grab point is at (50%, 80%) of the tile so the letter
+ * sits visibly above the finger on mobile rather than disappearing under
+ * it; on desktop the same offset keeps the cursor as the bottom anchor
+ * and the tile floats just above.
  */
 function DragGhost({ source, pos }: { source: DragSource; pos: { x: number; y: number } }) {
   const label =
@@ -202,7 +204,7 @@ function DragGhost({ source, pos }: { source: DragSource; pos: { x: number; y: n
         position: 'fixed',
         left: pos.x,
         top: pos.y,
-        transform: 'translate(-50%, -50%)',
+        transform: 'translate(-50%, -80%)',
         width: '90px',
         height: '90px',
         borderRadius: '8px',
