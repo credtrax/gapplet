@@ -3,33 +3,32 @@ import { useEffect, useState } from 'react';
 /**
  * ActivityBox — the pinball-display panel under the board.
  *
- * Two states:
+ * Layout: a dark recessed frame, two halves stacked vertically.
  *
  *   READY (game hasn't started, no input yet):
- *     - Top half:    static "Ready for you to start"
- *     - Bottom half: marquee scrolling "Drag a tile or tap a cell to start."
- *                    right-to-left, looping continuously.
+ *     Top:    static "Ready for you to start"
+ *     Bottom: marquee scrolling "Drag a tile or tap a cell to start."
+ *             right-to-left, looping continuously.
  *
- *   PLAYING / GAME-OVER (the rest of the time):
- *     - Top half:    quiet space
- *     - Bottom half: status message centered, cross-fading on each change
- *                    (fade out → swap → fade in over FADE_MS each direction).
- *                    Animation overlays (score popup, time-bonus pill,
- *                    charge-earned card) layer absolutely on this region.
+ *   PLAYING / GAME-OVER:
+ *     Top:    transient celebration line that fades in / out for each
+ *             commit — "+47 · ★" or "+102 · +2s · +1 hint" etc.
+ *             Empty between events. Replaces the floating score
+ *             popup, time-bonus pill, and charge-earned card.
+ *     Bottom: persistent status message, cross-fading on each change.
  *
- * The whole content is wrapped in a single opacity-transitioned div, so a
- * change of any of (statusMessage, tone, isReady) triggers a single
- * cross-fade — no jarring snap when the ready state ends.
+ * Cross-fade pipeline: when statusMessage / tone / isReady changes,
+ * the whole content opacity-transitions out, swaps, and back in.
  */
 
 export type ActivityEvent = {
-  /** Monotonic ID; React keys off this so each commit re-runs the animations. */
+  /** Monotonic ID; React keys off this so each commit re-runs the celebration. */
   id: number;
-  /** Points scored on this commit. 0 means no animation worth showing. */
+  /** Points scored on this commit. 0 = no celebration worth showing. */
   earned: number;
-  /** Star move (chain doubled) — gold treatment + ★ glyph. */
+  /** Star move (chain doubled). */
   isStar: boolean;
-  /** Hinted commit — muted treatment, "(hint)" tag. */
+  /** Hinted commit. */
   isHint: boolean;
   /** Chain multiplier in effect for this commit. */
   multiplier: number;
@@ -64,6 +63,22 @@ const FADE_MS = 350;
 const READY_TOP_LINE = 'Ready for you to start';
 const READY_MARQUEE_LINE = 'Drag a tile or tap a cell to start.';
 
+/**
+ * Build the top-line celebration string for a commit. Returns '' for
+ * commits worth no celebration (chain breaks, no-ops). Pieces stack
+ * with a "·" separator so a star move that also crossed a hint
+ * threshold reads like "+102 · ★ · +1 hint".
+ */
+function celebrationText(event: ActivityEvent | null): string {
+  if (!event || event.earned <= 0) return '';
+  const parts: string[] = [`+${event.earned}`];
+  if (event.isStar) parts.push('★');
+  if (event.isHint) parts.push('hint');
+  if (event.timeBonus > 0) parts.push(`+${event.timeBonus}s`);
+  if (event.chargeEarned) parts.push('+1 hint earned');
+  return parts.join(' · ');
+}
+
 type ShownState = {
   msg: string;
   tone: StatusTone;
@@ -93,6 +108,8 @@ export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
     }, FADE_MS);
     return () => clearTimeout(t);
   }, [statusMessage, tone, isReady, shown.msg, shown.tone, shown.isReady]);
+
+  const cel = !shown.isReady ? celebrationText(event) : '';
 
   return (
     <div
@@ -127,7 +144,7 @@ export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
             position: 'relative',
           }}
         >
-          {shown.isReady && (
+          {shown.isReady ? (
             <div
               className="pinball-status"
               style={{
@@ -140,6 +157,12 @@ export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
             >
               {READY_TOP_LINE}
             </div>
+          ) : (
+            event && cel && (
+              <div key={`cel-${event.id}`} className="pinball-celebration">
+                {cel}
+              </div>
+            )
           )}
         </div>
 
@@ -158,23 +181,6 @@ export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
           ) : (
             <PlayingStatus msg={shown.msg} tone={shown.tone} />
           )}
-
-          {/* Animation overlays only fire post-ready (event is null in ready). */}
-          {!shown.isReady && event && event.earned > 0 && (
-            <ScorePopup
-              key={`score-${event.id}`}
-              earned={event.earned}
-              multiplier={event.multiplier}
-              isStar={event.isStar}
-              isHint={event.isHint}
-            />
-          )}
-          {!shown.isReady && event && event.timeBonus > 0 && (
-            <TimeBonusBadge key={`time-${event.id}`} seconds={event.timeBonus} />
-          )}
-          {!shown.isReady && event && event.chargeEarned && (
-            <ChargeEarned key={`charge-${event.id}`} />
-          )}
         </div>
       </div>
     </div>
@@ -182,6 +188,11 @@ export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
 }
 
 function PlayingStatus({ msg, tone }: { msg: string; tone: StatusTone }) {
+  // Game-over status reads "Time! See your full chain below." — flank
+  // with stopwatch emojis so the moment lands as deliberate, not a
+  // generic success message.
+  const isGameOver = msg.startsWith('Time!');
+
   return (
     <div
       style={{
@@ -201,9 +212,18 @@ function PlayingStatus({ msg, tone }: { msg: string; tone: StatusTone }) {
           color: pinballColor(tone),
           fontWeight: tone === 'info' || tone === 'warning' ? 600 : 500,
           textAlign: 'center',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: isGameOver ? '12px' : 0,
         }}
       >
-        {msg}
+        {isGameOver && (
+          <span className="time-emoji" aria-hidden="true">⏱️</span>
+        )}
+        <span>{msg}</span>
+        {isGameOver && (
+          <span className="time-emoji" aria-hidden="true">⏱️</span>
+        )}
       </div>
       {/* Broken-chain icon: shows on any chain-break (tone='danger') that
           isn't a soap penalty (those carry their own 🧼 already). */}
@@ -222,10 +242,8 @@ function PlayingStatus({ msg, tone }: { msg: string; tone: StatusTone }) {
 
 function Marquee({ text }: { text: string }) {
   // Two identical copies in the track, padded so each copy is wider than
-  // any reasonable container — that keeps the loop seamless (no empty gap
-  // when the track has scrolled exactly one copy width). Glasses motif
-  // 👓 flanks each instance so the eyeglasses theme from the logo
-  // recurs as the text scrolls past.
+  // any reasonable container — that keeps the loop seamless. Glasses motif
+  // 👓 flanks each instance to recur the eyeglasses theme from the logo.
   const item = (
     <>
       <span className="marquee-glasses" aria-hidden="true">👓</span>
@@ -238,43 +256,6 @@ function Marquee({ text }: { text: string }) {
       <div className="pinball-marquee-track">
         <span className="pinball-marquee-item">{item}</span>
         <span className="pinball-marquee-item" aria-hidden="true">{item}</span>
-      </div>
-    </div>
-  );
-}
-
-function ScorePopup({
-  earned,
-  multiplier,
-  isStar,
-  isHint,
-}: {
-  earned: number;
-  multiplier: number;
-  isStar: boolean;
-  isHint: boolean;
-}) {
-  const variant = isStar ? ' score-popup--star' : isHint ? ' score-popup--hint' : '';
-  const suffix = isStar ? ' ★' : isHint ? ' hint' : '';
-  return (
-    <div className={`score-popup${variant}`}>
-      +{earned}
-      <span className="score-popup-multiplier">×{multiplier.toFixed(1)}</span>
-      {suffix && <span className="score-popup-suffix">{suffix}</span>}
-    </div>
-  );
-}
-
-function TimeBonusBadge({ seconds }: { seconds: number }) {
-  return <div className="time-bonus-badge">+{seconds}s</div>;
-}
-
-function ChargeEarned() {
-  return (
-    <div className="charge-earned">
-      <div className="charge-earned-card">
-        <img src="/word-nerd-logo.png" alt="" className="charge-earned-logo" />
-        <span className="charge-earned-text">+1 hint</span>
       </div>
     </div>
   );

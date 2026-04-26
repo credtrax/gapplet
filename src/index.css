@@ -260,174 +260,54 @@
 }
 
 /* ----------------------------------------------------------------------
- * Activity box animations — the dopamine surface under the board.
- * Score popup floats up out of the box; time-bonus badge slides in
- * from the right; charge-earned celebration scales in with the logo.
- * Each animation is one-shot — React keys the children to event.id
- * so every new commit re-mounts and re-runs the keyframes.
+ * Top-line celebration — fades in for each commit with the score and
+ * any special-moment tags (★ star, +Ns bonus, +1 hint earned). Replaces
+ * the older floating score popup / time-bonus pill / charge-earned card
+ * standalone animations: everything is now a single line-1 update.
+ * Keyed off event.id by the React parent so each commit re-mounts and
+ * re-runs the keyframe.
  * -------------------------------------------------------------------- */
 
-@keyframes gapplet-score-float {
+@keyframes gapplet-celebration {
   0% {
-    transform: translate(-50%, 8px) scale(0.7);
     opacity: 0;
+    transform: translateY(8px) scale(0.92);
   }
   12% {
-    transform: translate(-50%, 0) scale(1.15);
     opacity: 1;
+    transform: translateY(0) scale(1.06);
   }
-  35% {
-    transform: translate(-50%, -10px) scale(1);
+  22% {
+    transform: translateY(0) scale(1);
+  }
+  72% {
     opacity: 1;
+    transform: translateY(0) scale(1);
   }
   100% {
-    transform: translate(-50%, -85px) scale(0.95);
     opacity: 0;
+    transform: translateY(-6px) scale(1);
   }
 }
 
-.score-popup {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translate(-50%, 0);
-  font-size: 26px;
+.pinball-celebration {
+  font-size: 22px;
   font-weight: 700;
-  font-family: Georgia, "Times New Roman", serif;
-  color: var(--gapplet-pinball-success);
-  pointer-events: none;
-  white-space: nowrap;
-  text-shadow: 0 0 8px currentColor, 0 0 18px currentColor;
-  animation: gapplet-score-float 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
-  z-index: 5;
-}
-
-.score-popup--star {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--gapplet-pinball-hint);
-  text-shadow: 0 0 12px currentColor, 0 0 26px currentColor;
+  text-shadow: 0 0 8px currentColor, 0 0 18px currentColor;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+  animation: gapplet-celebration 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
 
-.score-popup--hint {
-  color: var(--gapplet-pinball-muted);
-  font-style: italic;
-  text-shadow: 0 0 4px currentColor;
-}
-
-.score-popup-multiplier {
-  font-size: 14px;
-  font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  margin-left: 6px;
-  opacity: 0.75;
-}
-
-.score-popup-suffix {
-  font-size: 12px;
-  font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  margin-left: 4px;
-  opacity: 0.7;
-  text-transform: lowercase;
-}
-
-@keyframes gapplet-time-bonus-slide {
-  0% {
-    transform: translateX(40px);
-    opacity: 0;
-  }
-  18% {
-    transform: translateX(-4px);
-    opacity: 1;
-  }
-  28% {
-    transform: translateX(0);
-  }
-  75% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 0;
-  }
-}
-
-.time-bonus-badge {
-  position: absolute;
-  right: 4px;
-  bottom: 0;
-  font-size: 14px;
-  font-weight: 700;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  color: #0d1426;
-  background: var(--gapplet-pinball-success);
-  border-radius: 4px;
-  padding: 3px 9px;
-  pointer-events: none;
-  box-shadow:
-    0 0 14px rgba(45, 212, 118, 0.6),
-    0 2px 6px rgba(0, 0, 0, 0.4);
-  animation: gapplet-time-bonus-slide 1.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
-  z-index: 4;
-}
-
-@keyframes gapplet-charge-pop {
-  0% {
-    transform: translate(-50%, -50%) scale(0);
-    opacity: 0;
-  }
-  20% {
-    transform: translate(-50%, -50%) scale(1.25);
-    opacity: 1;
-  }
-  35% {
-    transform: translate(-50%, -50%) scale(1);
-  }
-  80% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(0.95);
-    opacity: 0;
-  }
-}
-
-.charge-earned {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  animation: gapplet-charge-pop 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
-  z-index: 6;
-}
-
-/* White card carries the logo and the "+1 HINT" tag — gives the navy
- * logo enough contrast against the dark pinball bg, plus an amber
- * outer glow that looks like a "prize" indicator. */
-.charge-earned-card {
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 6px;
-  padding: 5px 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow:
-    0 0 22px 6px rgba(251, 191, 36, 0.55),
-    0 6px 20px rgba(0, 0, 0, 0.35);
-}
-
-.charge-earned-logo {
-  height: 32px;
-}
-
-.charge-earned-text {
-  font-size: 11px;
-  font-weight: 800;
-  color: #1d2c5b;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+/* Stopwatch emojis flanking the game-over message ("Time! ..."). Subtle
+ * blue drop-shadow matches the rest of the LED-glow palette. */
+.time-emoji {
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.45));
 }
 
 /* ----------------------------------------------------------------------
