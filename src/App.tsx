@@ -71,7 +71,7 @@ const POINTS_PER_HINT = 100;
 const ELIMINATE_IDLE_SECONDS = 10;
 
 /** Moves scoring at least this many points award a clock bonus. */
-const TIME_BONUS_THRESHOLD = 12;
+const TIME_BONUS_THRESHOLD = 15;
 /** Seconds added to the clock for each qualifying move. */
 const TIME_BONUS_SECONDS = 2;
 
