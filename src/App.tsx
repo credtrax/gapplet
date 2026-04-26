@@ -669,22 +669,6 @@ export function App() {
     : 'Eliminate';
 
   // ------------------------------------------------------------------
-  // Status line styling
-  // ------------------------------------------------------------------
-
-  const messageColor = (() => {
-    switch (statusTone) {
-      case 'success': return 'var(--gapplet-success)';
-      case 'danger': return 'var(--gapplet-danger)';
-      case 'warning': return 'var(--gapplet-hint)';
-      case 'info': return 'var(--gapplet-accent)';
-      default: return 'var(--gapplet-muted)';
-    }
-  })();
-
-  const messageWeight = statusTone === 'info' || statusTone === 'warning' ? 500 : 400;
-
-  // ------------------------------------------------------------------
   // Recent chain display (last 8 moves inline)
   // ------------------------------------------------------------------
 
@@ -770,8 +754,7 @@ export function App() {
         <ActivityBox
           event={activityEvent}
           statusMessage={statusMessage}
-          messageColor={messageColor}
-          messageWeight={messageWeight}
+          tone={statusTone}
         />
 
         <VirtualKeyboard
