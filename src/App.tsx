@@ -76,12 +76,12 @@ const TIME_BONUS_THRESHOLD = 14;
 /** Seconds added to the clock for each qualifying move. */
 const TIME_BONUS_SECONDS = 2;
 
-/** Format an integer seconds count as M:SS (zero-padded seconds).
- * Used for the "0:02" clock-bonus indicator in messages and celebrations. */
+/** Format an integer seconds count as +M:SS (zero-padded seconds).
+ * Used for the "+0:02" clock-bonus indicator in messages and celebrations. */
 function fmtBonus(s: number): string {
   const mm = Math.floor(s / 60);
   const ss = (s % 60).toString().padStart(2, '0');
-  return `${mm}:${ss}`;
+  return `+${mm}:${ss}`;
 }
 
 /** Clock seconds deducted when a player attempts a blocklisted word. */

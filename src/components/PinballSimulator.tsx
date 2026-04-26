@@ -86,9 +86,9 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    label: 'Good +14 (with 0:02)',
+    label: 'Good +14 (with +0:02)',
     category: 'Successful moves',
-    msg: 'Good: RAGED • 1.4× = +14  0:02!',
+    msg: 'Good: RAGED • 1.4× = +14  +0:02!',
     tone: 'success',
     isReady: false,
     event: {
@@ -133,9 +133,9 @@ const SCENARIOS: Scenario[] = [
 
   // --- Bonus moments ---
   {
-    label: 'Time bonus (+18 0:02)',
+    label: 'Time bonus (+18 +0:02)',
     category: 'Bonus moments',
-    msg: 'Good: BAKER • 1.6× = +18  0:02!',
+    msg: 'Good: BAKER • 1.6× = +18  +0:02!',
     tone: 'success',
     isReady: false,
     event: {
@@ -165,7 +165,7 @@ const SCENARIOS: Scenario[] = [
   {
     label: 'Mega (★ + bonus + charge)',
     category: 'Bonus moments',
-    msg: '★ Star move: BAK ER • chain doubled to 2.0× = +28  0:02!',
+    msg: '★ Star move: BAK ER • chain doubled to 2.0× = +28  +0:02!',
     tone: 'success',
     isReady: false,
     event: {

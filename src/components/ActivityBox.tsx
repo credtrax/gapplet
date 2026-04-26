@@ -93,7 +93,7 @@ function celebrationText(event: ActivityEvent | null): string {
   if (event.timeBonus > 0) {
     const mm = Math.floor(event.timeBonus / 60);
     const ss = (event.timeBonus % 60).toString().padStart(2, '0');
-    parts.push(`${mm}:${ss}`);
+    parts.push(`+${mm}:${ss}`);
   }
   if (event.chargeEarned) parts.push('+1 hint earned');
   return parts.join(' · ');
