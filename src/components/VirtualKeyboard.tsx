@@ -1,33 +1,29 @@
 import { useDrag, type DragSource } from '../lib/drag';
 
 type VirtualKeyboardProps = {
-  /**
-   * Called when a letter key is tapped (the click fallback path). Receives
-   * the uppercase letter. The drag path bypasses this — it goes straight to
-   * the DragProvider's onDrop.
-   */
   onLetterKey: (letter: string) => void;
-  /** Tap fallback: ⌫ acts on the selected cell. */
   onBackspace: () => void;
-  /** Tap fallback: Space acts on the selected cell. */
   onSpace: () => void;
-  /**
-   * Called when "Restart Chain" is tapped. Returns the board to the seed
-   * and resets the chain multiplier.
-   */
   onRestartChain: () => void;
-  /** Called when the "Buy Guess" key is tapped. Same as the hint system. */
   onBuyHint: () => void;
+  onEliminate: () => void;
   letterKeyDisabled: boolean;
   backspaceDisabled: boolean;
   spaceDisabled: boolean;
   restartChainDisabled: boolean;
   hintDisabled: boolean;
-  /**
-   * Label for the Buy Guess button. Includes a live mm:ss countdown when
-   * the minute-1 hint has been used and minute-2 hasn't unlocked yet.
-   */
+  eliminateDisabled: boolean;
   hintLabel: string;
+  eliminateLabel: string;
+  /** 0–100. Visual progress toward the next Buy Guess charge. */
+  hintMeterPercent: number;
+  /** 0–100. Visual progress toward the Eliminate idle unlock. */
+  eliminateMeterPercent: number;
+  /**
+   * Letters that should be visually greyed out and blocked from drag/tap.
+   * Populated by App when the Eliminate Useless Letters tool is active.
+   */
+  disabledLetters: Set<string>;
 };
 
 const ROW1 = 'QWERTYUIOP'.split('');
@@ -46,8 +42,6 @@ const LETTER_KEY_STYLE: React.CSSProperties = {
   fontWeight: 500,
   color: 'var(--gapplet-fg)',
   cursor: 'grab',
-  // touchAction: 'none' lets pointer-drag work on touch without the browser
-  // treating it as a scroll gesture. Critical for mobile drag.
   touchAction: 'none',
   userSelect: 'none',
 };
@@ -78,39 +72,43 @@ const SPACE_KEY_STYLE: React.CSSProperties = {
   fontWeight: 600,
 };
 
-// Top-row actions don't drag — they act on game state, not on a cell.
-const TOP_ACTION_KEY_STYLE: React.CSSProperties = {
+// Top-row tool buttons. Click-only (they act on game state, not on a cell).
+// Position: relative so the absolute-positioned meter lands at the bottom.
+const TOOL_KEY_STYLE: React.CSSProperties = {
   ...LETTER_KEY_STYLE,
   flex: 1,
   fontSize: '11px',
   textTransform: 'uppercase',
   letterSpacing: '0.04em',
   fontWeight: 600,
-  minHeight: '42px',
+  minHeight: '46px',
   cursor: 'pointer',
   touchAction: 'manipulation',
+  position: 'relative',
+  overflow: 'hidden',
 };
 
 /**
  * Mobile-first on-screen keyboard, drag-input variant.
  *
  * Layout (top to bottom):
- *   [Restart Chain] [Buy Guess]                   row 0: two top actions
- *   Q W E R T Y U I O P                           row 1
- *   A S D F G H J K L                             row 2 (slight inset)
- *   Z X C V B N M [⌫]                             row 3
- *   [               Space               ]         row 4 (full width)
+ *   [Restart Chain] [Buy Guess (n) ▮▮▮  ] [Eliminate ▮▮  ]   row 0: 3 tools
+ *   Q W E R T Y U I O P                                       row 1
+ *   A S D F G H J K L                                         row 2 (slight inset)
+ *   Z X C V B N M [⌫]                                         row 3
+ *   [               Space               ]                     row 4
  *
- * Letter / Space / Backspace tiles are draggable: pointerdown anywhere on
- * the tile starts a drag, and dropping on a board cell commits the move.
- * A tap (release without crossing the drag threshold) falls through to
- * the click handler — same effect, but only works after a cell is
- * selected. Restart Chain and Buy Guess are click-only; they don't act
- * on a target cell.
+ * Top-row tools each show a thin progress meter at the bottom edge:
+ *   - Restart Chain: no meter (always available; cost is the chain reset).
+ *   - Buy Guess: meter fills score%100 → 0 each charge earned. Disabled
+ *                when no charges are banked.
+ *   - Eliminate: meter fills idleSeconds/10 → 0 on activation or commit.
+ *                Disabled while < 10s idle, or while already active.
  *
- * Enter and Revert keys removed in the drag-input experiment: there's no
- * dirty intermediate state to confirm or revert. Hardware keyboard input
- * is also disabled.
+ * Letter / Space / Backspace tiles are draggable — pointerdown on the tile
+ * starts a drag and a drop on a board cell commits the move. A tap (no
+ * drag movement) falls through to the click handler with the same effect
+ * once a cell is selected.
  */
 export function VirtualKeyboard({
   onLetterKey,
@@ -118,12 +116,18 @@ export function VirtualKeyboard({
   onSpace,
   onRestartChain,
   onBuyHint,
+  onEliminate,
   letterKeyDisabled,
   backspaceDisabled,
   spaceDisabled,
   restartChainDisabled,
   hintDisabled,
+  eliminateDisabled,
   hintLabel,
+  eliminateLabel,
+  hintMeterPercent,
+  eliminateMeterPercent,
+  disabledLetters,
 }: VirtualKeyboardProps) {
   const { startDrag } = useDrag();
 
@@ -144,20 +148,31 @@ export function VirtualKeyboard({
         <button
           onClick={onRestartChain}
           disabled={restartChainDisabled}
-          style={TOP_ACTION_KEY_STYLE}
+          style={TOOL_KEY_STYLE}
           aria-label="Restart chain — back to the seed word, chain resets"
-          title="Return to the seed word. Chain resets to ×1.0. Previous path stays blocked. Disabled in hard mode."
+          title="Return to the seed word. Chain resets to ×1.0. Previous path stays blocked."
         >
           Restart Chain
         </button>
         <button
           onClick={onBuyHint}
           disabled={hintDisabled}
-          style={TOP_ACTION_KEY_STYLE}
+          style={TOOL_KEY_STYLE}
           aria-label={`Buy Guess — ${hintLabel}`}
-          title="Buy a hint. One per minute of play, no stacking. Chain does not advance on hinted moves; cost equals the placed letter's value."
+          title="Earn one charge per 100 points. Spend a charge to insert a free legal letter; the chain holds (does not advance) on hinted moves."
         >
           {hintLabel}
+          <ToolMeter percent={hintMeterPercent} kind="hint" />
+        </button>
+        <button
+          onClick={onEliminate}
+          disabled={eliminateDisabled}
+          style={TOOL_KEY_STYLE}
+          aria-label={`Eliminate Useless Letters — ${eliminateLabel}`}
+          title="Available after 10 seconds of inactivity. Greys out letters that can't form any legal next word. Costs your chain multiplier (resets to ×1.0)."
+        >
+          {eliminateLabel}
+          <ToolMeter percent={eliminateMeterPercent} kind="eliminate" />
         </button>
       </div>
       <div style={{ display: 'flex', gap: '5px' }}>
@@ -166,6 +181,7 @@ export function VirtualKeyboard({
             key={l}
             letter={l}
             disabled={letterKeyDisabled}
+            culled={disabledLetters.has(l)}
             onTap={() => onLetterKey(l)}
             startDrag={startDrag}
           />
@@ -177,6 +193,7 @@ export function VirtualKeyboard({
             key={l}
             letter={l}
             disabled={letterKeyDisabled}
+            culled={disabledLetters.has(l)}
             onTap={() => onLetterKey(l)}
             startDrag={startDrag}
           />
@@ -188,6 +205,7 @@ export function VirtualKeyboard({
             key={l}
             letter={l}
             disabled={letterKeyDisabled}
+            culled={disabledLetters.has(l)}
             onTap={() => onLetterKey(l)}
             startDrag={startDrag}
           />
@@ -217,24 +235,68 @@ export function VirtualKeyboard({
   );
 }
 
+/**
+ * Thin progress bar pinned to the bottom edge of a tool button. Width is
+ * driven by the percent prop; the CSS transition smooths small per-move
+ * deltas. The colour key matches the tool: amber for the hint meter
+ * (echoes the Buy Guess hint amber), green for eliminate (echoes the
+ * drag-target highlight).
+ */
+function ToolMeter({ percent, kind }: { percent: number; kind: 'hint' | 'eliminate' }) {
+  const color = kind === 'hint' ? 'var(--gapplet-hint)' : 'var(--gapplet-success)';
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        left: 0,
+        bottom: 0,
+        height: '3px',
+        width: `${percent}%`,
+        background: color,
+        transition: 'width 0.5s ease-out',
+        borderRadius: '0 0 5px 5px',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
 function DraggableLetterKey({
   letter,
   disabled,
+  culled,
   onTap,
   startDrag,
 }: {
   letter: string;
   disabled: boolean;
+  /** True when Eliminate has greyed this letter out. Block drag + tap and
+   * dim the visual; users can't waste their move on a useless letter. */
+  culled: boolean;
   onTap: () => void;
   startDrag: (source: DragSource, e: React.PointerEvent) => void;
 }) {
+  const inactive = disabled || culled;
   return (
     <button
-      onPointerDown={(e) => !disabled && startDrag({ kind: 'letter', letter }, e)}
-      onClick={onTap}
+      onPointerDown={(e) => {
+        if (inactive) return;
+        startDrag({ kind: 'letter', letter }, e);
+      }}
+      onClick={() => {
+        if (inactive) return;
+        onTap();
+      }}
       disabled={disabled}
-      style={LETTER_KEY_STYLE}
-      aria-label={`Letter ${letter}`}
+      style={{
+        ...LETTER_KEY_STYLE,
+        opacity: culled ? 0.28 : 1,
+        cursor: culled ? 'not-allowed' : LETTER_KEY_STYLE.cursor,
+        transition: 'opacity 0.25s ease-out',
+      }}
+      aria-label={`Letter ${letter}${culled ? ' (no legal moves)' : ''}`}
+      aria-disabled={culled || undefined}
     >
       {letter}
     </button>

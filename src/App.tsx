@@ -16,40 +16,27 @@ import {
   doubleChain,
   createdInteriorSplit,
   scoreMove,
-  scoreHintedMove,
   CHAIN_START,
   type Board as BoardType,
   type Neighbor,
 } from './lib/game';
-import { LETTER_VALUES, SPACE } from './lib/letterValues';
+import { SPACE } from './lib/letterValues';
 import { DragProvider, type DragSource } from './lib/drag';
 
 const GAME_DURATION_SECONDS = 120;
 
-/**
- * A single entry in the move history. Exported so GameOver can type its props.
- */
+/** A single entry in the move history. */
 export type HistoryEntry = {
   board: BoardType;
   words: string[];
   points: number;
-  /** True for the seed row (move 0), false for all played moves */
   initial: boolean;
-  /** True if this move was pre-placed by the "Buy a guess" button */
   hinted: boolean;
-  /** Which minute the hint was used in (1 or 2), or null for normal moves */
   minuteUsed: number | null;
-  /**
-   * True if this entry represents the player bailing out of a dead-end by
-   * hitting "Restart Chain" — board reverts to the seed, chain resets, but
-   * seenConfigs retain the previous path so it can't be re-walked.
-   */
   restructured?: boolean;
-  /** Chain multiplier after this move was committed. */
   chainAfter: number;
 };
 
-type HintsByWindow = { 1: number; 2: number };
 type MessageTone = 'info' | 'success' | 'warning' | 'danger' | null;
 
 function initGame(): { seed: string; seedDate: string; isPractice: boolean } {
@@ -74,6 +61,14 @@ type SubmissionState =
   | { status: 'duplicate' }
   | { status: 'unauthenticated' }
   | { status: 'practice' };
+
+const ALL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/** Score points needed to earn one Buy Guess charge. */
+const POINTS_PER_HINT = 100;
+
+/** Seconds of inactivity before the Eliminate tool unlocks. */
+const ELIMINATE_IDLE_SECONDS = 10;
 
 export function App() {
   // --- Core game state ---
@@ -104,13 +99,21 @@ export function App() {
   const timerRef = useRef<number | null>(null);
 
   // --- Interaction ---
-  // selectedIdx still exists for the tap-fallback path: tap a cell, then
-  // tap a letter / Backspace / Space to commit a move on that cell. The
-  // drag path bypasses selectedIdx entirely — drops know their own target.
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
-  // --- Hint budget ---
-  const [hintsByWindow, setHintsByWindow] = useState<HintsByWindow>({ 1: 0, 2: 0 });
+  // --- Tool: Buy Guess (score-gated charges) ---
+  // Charges earned = floor(score / POINTS_PER_HINT). hintsUsed tracks how
+  // many have been spent, so available = earned − used. Score is monotone
+  // non-decreasing, so charges never lock back down once earned.
+  const [hintsUsed, setHintsUsed] = useState(0);
+
+  // --- Tool: Eliminate Useless Letters (idle-gated, costs chain) ---
+  // idleSeconds increments via the 1 Hz timer interval and resets on every
+  // commit attempt (success or fail). Available when idleSeconds ≥
+  // ELIMINATE_IDLE_SECONDS and not already active. eliminateActive flips
+  // true when the tool is pressed; it clears on the next successful commit.
+  const [idleSeconds, setIdleSeconds] = useState(0);
+  const [eliminateActive, setEliminateActive] = useState(false);
 
   // --- Status line ---
   const [statusMessage, setStatusMessage] = useState<string>(
@@ -135,7 +138,7 @@ export function App() {
     try {
       localStorage.setItem('gapplet:seen-howto', '1');
     } catch {
-      /* private-mode storage disabled — fine, they'll re-see the tutorial */
+      /* private-mode storage disabled */
     }
   };
 
@@ -143,8 +146,14 @@ export function App() {
   // Derived helpers
   // ------------------------------------------------------------------
 
+  /** Approximate "which minute" a hinted move was used in. Kept for
+   * server-side telemetry compatibility (validate-score reads it). */
   const currentWindow = (): 1 | 2 => (timeLeft > 60 ? 1 : 2);
-  const hintsLeftInWindow = (): number => (hintsByWindow[currentWindow()] > 0 ? 0 : 1);
+
+  const hintsEarned = Math.floor(score / POINTS_PER_HINT);
+  const hintsAvailable = Math.max(0, hintsEarned - hintsUsed);
+  const hintMeterPercent = ((score % POINTS_PER_HINT) / POINTS_PER_HINT) * 100;
+  const eliminateMeterPercent = Math.min(100, (idleSeconds / ELIMINATE_IDLE_SECONDS) * 100);
 
   // ------------------------------------------------------------------
   // Score submission on game-end
@@ -253,12 +262,35 @@ export function App() {
     }
   }, [session, submission.status]);
 
-  const unusedNeighborCount = useMemo(() => {
-    if (gameOver) return 0;
+  // Set of unused one-swap neighbors from the current committed board.
+  // Drives both the visible "Paths" stat and the Eliminate Useless Letters
+  // grey-out (the letters with no entry here are useless).
+  const validNeighbors = useMemo(() => {
+    if (gameOver) return [];
     const current = history[history.length - 1].board;
-    const neighbors = findNeighbors(current);
-    return neighbors.filter((n) => !seenConfigs.has(boardKey(n.board))).length;
+    return findNeighbors(current).filter((n) => !seenConfigs.has(boardKey(n.board)));
   }, [history, seenConfigs, gameOver]);
+
+  const unusedNeighborCount = validNeighbors.length;
+
+  /**
+   * Letters that, when placed in at least one cell, produce a valid unseen
+   * 5-letter word. The complement of this set (within A–Z) is what the
+   * Eliminate tool greys out.
+   */
+  const usefulLetters = useMemo(() => {
+    const set = new Set<string>();
+    for (const n of validNeighbors) {
+      if (n.placedChar === SPACE) continue;
+      set.add(n.placedChar);
+    }
+    return set;
+  }, [validNeighbors]);
+
+  const disabledLetters = useMemo(() => {
+    if (!eliminateActive) return new Set<string>();
+    return new Set(ALL_LETTERS.split('').filter((l) => !usefulLetters.has(l)));
+  }, [eliminateActive, usefulLetters]);
 
   // ------------------------------------------------------------------
   // Timer
@@ -285,6 +317,9 @@ export function App() {
         }
         return next;
       });
+      // Idle counter ticks alongside the clock. Capped at the unlock
+      // threshold so the meter doesn't overflow visually.
+      setIdleSeconds((s) => Math.min(ELIMINATE_IDLE_SECONDS, s + 1));
     }, 1000);
   }, [stopTimer]);
 
@@ -302,27 +337,26 @@ export function App() {
   };
 
   // ------------------------------------------------------------------
-  // Move commit — the single funnel for both drag and tap-fallback paths.
+  // Move commit
   // ------------------------------------------------------------------
 
   /**
-   * Attempt to commit nextBoard as a move. The caller has already
-   * decided exactly what the new board state should be (no "dirty"
-   * intermediate state). This either commits cleanly or rejects with a
-   * status message and (where appropriate) a chain reset.
+   * Attempt to commit nextBoard as a move. Caller has decided exactly what
+   * the new board state should be (no dirty intermediate state).
    *
-   * opts.hint: present iff this came from Buy Guess. Uses the hinted
-   *   scoring formula, holds the chain instead of advancing, and tags
-   *   the history entry as hinted.
+   * opts.hint: hinted commit from Buy Guess. Hint moves don't advance the
+   *   chain (the trade for getting a free legal move). They do score the
+   *   board fully — the charge cost is paid up front, so per-move scoring
+   *   is unmodified.
    */
   const attemptCommit = (nextBoard: BoardType, opts?: { hint?: Neighbor }) => {
     if (gameOver) return;
     maybeStartClock();
+    // Any commit attempt counts as activity, regardless of outcome.
+    setIdleSeconds(0);
 
     const prev = history[history.length - 1].board;
 
-    // No-op: drop landed somewhere that produced no change (e.g., letter
-    // dropped on a cell that already has it). Don't break the chain.
     if (boardKey(nextBoard) === boardKey(prev)) {
       setStatusMessage('No change.');
       setStatusTone('info');
@@ -350,12 +384,12 @@ export function App() {
     let newChain: number;
 
     if (opts?.hint) {
-      earned = scoreHintedMove(nextBoard, chain, opts.hint.placedChar);
+      // Hinted: chain held, board scored normally at the held multiplier.
+      // The "cost" is one charge, paid out of the meter (handled in buyHint).
+      earned = scoreMove(nextBoard, chain);
       newChain = chain;
-      const placedVal =
-        opts.hint.placedChar === SPACE ? 0 : (LETTER_VALUES[opts.hint.placedChar] ?? 0);
       setStatusMessage(
-        `Hint used: ${v.words.join(' + ')} • board ${chain.toFixed(1)}× − ${placedVal} = +${earned} (chain held)`
+        `Hint used: ${v.words.join(' + ')} • ${chain.toFixed(1)}× = +${earned} (chain held)`
       );
       setStatusTone('warning');
     } else if (createdInteriorSplit(prev, nextBoard)) {
@@ -391,13 +425,17 @@ export function App() {
       },
     ]);
     setSelectedIdx(null);
+    // Successful commit consumes the eliminate active state — the grey-out
+    // is recomputed for the new board on the next press.
+    setEliminateActive(false);
   };
 
   // ------------------------------------------------------------------
-  // Restart Chain
+  // Tools
   // ------------------------------------------------------------------
 
-  const HARD_MODE = false; // TODO: wire to a real setting once hard mode lands
+  const HARD_MODE = false;
+
   const restartChain = () => {
     if (gameOver) return;
     if (HARD_MODE) return;
@@ -405,6 +443,8 @@ export function App() {
     const seedBoard = startSeed.split('');
     setBoard(seedBoard);
     setChain(CHAIN_START);
+    setIdleSeconds(0);
+    setEliminateActive(false);
     setHistory((prev) => [
       ...prev,
       {
@@ -425,10 +465,6 @@ export function App() {
     setStatusTone('warning');
   };
 
-  // ------------------------------------------------------------------
-  // Buy Guess — pre-places a legal letter and auto-commits as hinted.
-  // ------------------------------------------------------------------
-
   const buyHint = () => {
     if (gameOver) return;
     if (!timerStarted) {
@@ -436,31 +472,43 @@ export function App() {
       setStatusTone('info');
       return;
     }
-    if (hintsLeftInWindow() <= 0) {
-      const w = currentWindow();
-      if (w === 1) {
-        setStatusMessage('You already used your minute-1 hint. Next hint at 1:00.');
-      } else {
-        setStatusMessage('No hints left — minute-2 hint already used.');
-      }
+    if (hintsAvailable <= 0) {
+      const need = POINTS_PER_HINT - (score % POINTS_PER_HINT);
+      setStatusMessage(`Earn ${need} more point${need === 1 ? '' : 's'} to unlock another hint.`);
       setStatusTone('info');
       return;
     }
     const current = history[history.length - 1].board;
-    const neighbors = findNeighbors(current);
     // Hints may not create interior-space splits — those are star-move
     // territory for the player to find.
-    const usable = neighbors.filter(
-      (n) => !seenConfigs.has(boardKey(n.board)) && !createdInteriorSplit(current, n.board)
-    );
+    const usable = validNeighbors.filter((n) => !createdInteriorSplit(current, n.board));
     if (usable.length === 0) {
       setStatusMessage('No legal non-star moves from this position. Try restructuring.');
       setStatusTone('danger');
       return;
     }
-    setHintsByWindow((h) => ({ ...h, [currentWindow()]: 1 }));
+    setHintsUsed((u) => u + 1);
     const choice = usable[Math.floor(Math.random() * usable.length)];
     attemptCommit(choice.board, { hint: choice });
+  };
+
+  const eliminateUseless = () => {
+    if (gameOver) return;
+    if (eliminateActive) return; // already active — wait for next commit
+    if (idleSeconds < ELIMINATE_IDLE_SECONDS) {
+      const wait = ELIMINATE_IDLE_SECONDS - idleSeconds;
+      setStatusMessage(`Wait ${wait} more second${wait === 1 ? '' : 's'} of inactivity to unlock Eliminate.`);
+      setStatusTone('info');
+      return;
+    }
+    setEliminateActive(true);
+    setChain(CHAIN_START);
+    setIdleSeconds(0);
+    const culled = 26 - usefulLetters.size;
+    setStatusMessage(
+      `Eliminate active: ${culled} letter${culled === 1 ? '' : 's'} greyed out. Chain reset to ×1.0.`
+    );
+    setStatusTone('warning');
   };
 
   // ------------------------------------------------------------------
@@ -469,10 +517,13 @@ export function App() {
 
   const handleDrop = (source: DragSource, targetIdx: number | null) => {
     if (gameOver) return;
-    if (targetIdx == null) return; // released off any cell — silent no-op
+    if (targetIdx == null) return;
     const prev = history[history.length - 1].board;
 
     if (source.kind === 'letter') {
+      // Block useless letters when Eliminate is active. The grey-out is
+      // visual; this is the functional block at the drag boundary.
+      if (disabledLetters.has(source.letter)) return;
       const next = prev.slice();
       next[targetIdx] = source.letter;
       attemptCommit(next);
@@ -487,9 +538,6 @@ export function App() {
     }
 
     if (source.kind === 'backspace') {
-      // Same shift-collapse semantics as the old Backspace: remove the
-      // letter (or space) at targetIdx, shift everything to its right one
-      // position left, trailing space added at index 4.
       if (targetIdx === 4 && prev[4] === SPACE) {
         setStatusMessage("That's already the trailing space — nothing would shift.");
         setStatusTone('info');
@@ -505,7 +553,6 @@ export function App() {
     }
 
     if (source.kind === 'board-cell') {
-      // Swap source.idx with targetIdx. Same-cell drop is a no-op.
       if (source.idx === targetIdx) return;
       const next = prev.slice();
       [next[source.idx], next[targetIdx]] = [next[targetIdx], next[source.idx]];
@@ -515,23 +562,19 @@ export function App() {
   };
 
   // ------------------------------------------------------------------
-  // Hint button label
+  // Tool button labels
   // ------------------------------------------------------------------
 
-  const hintButtonDisabled = gameOver || (timerStarted && hintsLeftInWindow() <= 0);
+  const hintButtonDisabled = gameOver || hintsAvailable <= 0;
+  const hintLabel = hintsAvailable > 0 ? `Buy Guess (${hintsAvailable})` : 'Buy Guess';
 
-  const hintLabel = (() => {
-    if (gameOver) return 'Buy Guess';
-    if (!timerStarted) return 'Buy Guess';
-    if (hintsLeftInWindow() > 0) return 'Buy Guess';
-    if (currentWindow() === 1) {
-      const wait = Math.max(0, timeLeft - 60);
-      const m = Math.floor(wait / 60);
-      const s = wait % 60;
-      return `${m}:${s.toString().padStart(2, '0')}`;
-    }
-    return 'No hints';
-  })();
+  const eliminateButtonDisabled =
+    gameOver || eliminateActive || idleSeconds < ELIMINATE_IDLE_SECONDS;
+  const eliminateLabel = eliminateActive
+    ? 'Active'
+    : idleSeconds >= ELIMINATE_IDLE_SECONDS
+    ? 'Eliminate'
+    : 'Eliminate';
 
   // ------------------------------------------------------------------
   // Status line styling
@@ -601,7 +644,7 @@ export function App() {
               chain={chain}
               timerStarted={timerStarted}
               neighborCount={unusedNeighborCount}
-              hardMode={false /* TODO: wire to real hard-mode setting (task #22) */}
+              hardMode={false}
             />
             <button
               onClick={() => setShowHowTo(true)}
@@ -630,21 +673,45 @@ export function App() {
           }}
         />
 
+        {/* Two-line activity area under the board. Top line is the status
+            message; bottom line is reserved for animation surfaces (score
+            popups, charge-earned celebrations, etc. — populated in
+            follow-up commits). */}
         <div
+          className="gapplet-activity-box"
           style={{
-            minHeight: '22px',
-            fontSize: '14px',
+            minHeight: '52px',
             margin: '6px 0 1rem',
-            color: messageColor,
-            fontWeight: messageWeight,
+            padding: '6px 0',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            position: 'relative',
           }}
         >
-          {statusMessage}
+          <div
+            style={{
+              fontSize: '14px',
+              color: messageColor,
+              fontWeight: messageWeight,
+              minHeight: '20px',
+            }}
+          >
+            {statusMessage}
+          </div>
+          <div
+            aria-hidden="true"
+            style={{
+              minHeight: '20px',
+              /* Animation layer — empty placeholder for now. */
+            }}
+          />
         </div>
 
         <VirtualKeyboard
           onLetterKey={(letter) => {
             if (gameOver) return;
+            if (disabledLetters.has(letter)) return;
             if (selectedIdx == null) {
               setStatusMessage('Tap a cell first, or drag the letter onto a cell.');
               setStatusTone('info');
@@ -674,6 +741,7 @@ export function App() {
           }}
           onRestartChain={restartChain}
           onBuyHint={buyHint}
+          onEliminate={eliminateUseless}
           letterKeyDisabled={gameOver}
           backspaceDisabled={gameOver}
           spaceDisabled={gameOver}
@@ -682,7 +750,12 @@ export function App() {
             history[history.length - 1].board.join('') === startSeed
           }
           hintDisabled={hintButtonDisabled}
+          eliminateDisabled={eliminateButtonDisabled}
           hintLabel={hintLabel}
+          eliminateLabel={eliminateLabel}
+          hintMeterPercent={hintMeterPercent}
+          eliminateMeterPercent={eliminateMeterPercent}
+          disabledLetters={disabledLetters}
         />
 
         <div>
