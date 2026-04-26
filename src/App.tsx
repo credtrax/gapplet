@@ -22,6 +22,7 @@ import {
 } from './lib/game';
 import { SPACE } from './lib/letterValues';
 import { DragProvider, type DragSource, type DropTarget } from './lib/drag';
+import { ActivityBox, type ActivityEvent } from './components/ActivityBox';
 
 const GAME_DURATION_SECONDS = 120;
 
@@ -126,6 +127,13 @@ export function App() {
   // Count of blocklisted-word attempts. Used by the share emit to display
   // a soap emoji per offense (handled in a follow-up commit).
   const [soapPenalties, setSoapPenalties] = useState(0);
+
+  // Most recent commit's animation payload. ActivityBox keys its
+  // children off `id`, so each new event re-mounts the children and
+  // re-runs their CSS keyframes. eventIdRef gives us a monotonic ID
+  // without forcing a render dependency.
+  const [activityEvent, setActivityEvent] = useState<ActivityEvent | null>(null);
+  const eventIdRef = useRef(0);
 
   // --- Status line ---
   const [statusMessage, setStatusMessage] = useState<string>(
@@ -416,6 +424,7 @@ export function App() {
     let newChain: number;
     let messageBase: string;
     let tone: MessageTone;
+    let isStar = false;
 
     if (opts?.hint) {
       // Hinted: chain held, board scored normally at the held multiplier.
@@ -429,6 +438,7 @@ export function App() {
       earned = scoreMove(nextBoard, newChain);
       messageBase = `★ Star move: ${v.words.join(' + ')} • chain doubled to ${newChain.toFixed(1)}× = +${earned}`;
       tone = 'success';
+      isStar = true;
     } else {
       newChain = advanceChain(chain);
       earned = scoreMove(nextBoard, newChain);
@@ -445,6 +455,23 @@ export function App() {
     }
     setStatusMessage(timeBonus > 0 ? `${messageBase}  +${timeBonus}s!` : messageBase);
     setStatusTone(tone);
+
+    // Charge-earned detection: did this commit push the score across the
+    // next POINTS_PER_HINT boundary? Score is monotone non-decreasing
+    // and `earned` is non-negative, so a simple floor comparison suffices.
+    const chargeEarned =
+      Math.floor((score + earned) / POINTS_PER_HINT) > Math.floor(score / POINTS_PER_HINT);
+
+    eventIdRef.current += 1;
+    setActivityEvent({
+      id: eventIdRef.current,
+      earned,
+      isStar,
+      isHint: !!opts?.hint,
+      multiplier: newChain,
+      timeBonus,
+      chargeEarned,
+    });
 
     setScore((s) => s + earned);
     setChain(newChain);
@@ -740,40 +767,12 @@ export function App() {
           }}
         />
 
-        {/* Two-line activity area under the board. Top line is the status
-            message; bottom line is reserved for animation surfaces (score
-            popups, charge-earned celebrations, etc. — populated in
-            follow-up commits). */}
-        <div
-          className="gapplet-activity-box"
-          style={{
-            minHeight: '52px',
-            margin: '6px 0 1rem',
-            padding: '6px 0',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            position: 'relative',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '14px',
-              color: messageColor,
-              fontWeight: messageWeight,
-              minHeight: '20px',
-            }}
-          >
-            {statusMessage}
-          </div>
-          <div
-            aria-hidden="true"
-            style={{
-              minHeight: '20px',
-              /* Animation layer — empty placeholder for now. */
-            }}
-          />
-        </div>
+        <ActivityBox
+          event={activityEvent}
+          statusMessage={statusMessage}
+          messageColor={messageColor}
+          messageWeight={messageWeight}
+        />
 
         <VirtualKeyboard
           onLetterKey={(letter) => {

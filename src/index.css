@@ -136,6 +136,164 @@
 }
 
 /* ----------------------------------------------------------------------
+ * Activity box animations — the dopamine surface under the board.
+ * Score popup floats up out of the box; time-bonus badge slides in
+ * from the right; charge-earned celebration scales in with the logo.
+ * Each animation is one-shot — React keys the children to event.id
+ * so every new commit re-mounts and re-runs the keyframes.
+ * -------------------------------------------------------------------- */
+
+@keyframes gapplet-score-float {
+  0% {
+    transform: translate(-50%, 8px) scale(0.7);
+    opacity: 0;
+  }
+  12% {
+    transform: translate(-50%, 0) scale(1.15);
+    opacity: 1;
+  }
+  35% {
+    transform: translate(-50%, -10px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -85px) scale(0.95);
+    opacity: 0;
+  }
+}
+
+.score-popup {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, 0);
+  font-size: 26px;
+  font-weight: 700;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--gapplet-success);
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  animation: gapplet-score-float 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  z-index: 5;
+}
+
+.score-popup--star {
+  color: var(--gapplet-hint);
+  text-shadow:
+    0 0 10px rgba(245, 158, 11, 0.6),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.score-popup--hint {
+  color: var(--gapplet-muted);
+  font-style: italic;
+}
+
+.score-popup-multiplier {
+  font-size: 14px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  margin-left: 6px;
+  opacity: 0.75;
+}
+
+.score-popup-suffix {
+  font-size: 12px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  margin-left: 4px;
+  opacity: 0.7;
+  text-transform: lowercase;
+}
+
+@keyframes gapplet-time-bonus-slide {
+  0% {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  18% {
+    transform: translateX(-4px);
+    opacity: 1;
+  }
+  28% {
+    transform: translateX(0);
+  }
+  75% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+}
+
+.time-bonus-badge {
+  position: absolute;
+  right: 4px;
+  bottom: 0;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #fff;
+  background: var(--gapplet-success);
+  border-radius: 4px;
+  padding: 3px 9px;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.4);
+  animation: gapplet-time-bonus-slide 1.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  z-index: 4;
+}
+
+@keyframes gapplet-charge-pop {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(-50%, -50%) scale(1.25);
+    opacity: 1;
+  }
+  35% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0;
+  }
+}
+
+.charge-earned {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  animation: gapplet-charge-pop 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  z-index: 6;
+}
+
+.charge-earned-logo {
+  height: 38px;
+  filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.55));
+}
+
+.charge-earned-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gapplet-hint);
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+/* ----------------------------------------------------------------------
  * Dirty-cell pulse — yellow ring that throbs to signal uncommitted edits.
  * Box-shadow stack includes the base tile shadows so the tile stays
  * raised while the ring pulses.
