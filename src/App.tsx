@@ -421,7 +421,7 @@ export function App() {
     }
     const key = boardKey(nextBoard);
     if (seenConfigs.has(key)) {
-      setStatusMessage('Already played that exact configuration. Chain broken.');
+      setStatusMessage(`Already played ${v.words.join(' + ')}. Chain broken.`);
       setStatusTone('danger');
       setChain(CHAIN_START);
       setSelectedIdx(null);

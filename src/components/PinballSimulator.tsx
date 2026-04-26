@@ -205,7 +205,7 @@ const SCENARIOS: Scenario[] = [
   {
     label: 'Repeat config',
     category: 'Failures',
-    msg: 'Already played that exact configuration. Chain broken.',
+    msg: 'Already played BREAD. Chain broken.',
     tone: 'danger',
     isReady: false,
     event: null,

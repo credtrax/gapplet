@@ -149,7 +149,13 @@ export function ActivityBox({
   ]);
 
   const isClockRunning = !shown.isReady && shown.msg.startsWith('Clock running');
-  const cel = !shown.isReady && !isClockRunning ? celebrationText(event) : '';
+  const isSoapPenalty = !shown.isReady && shown.msg.startsWith('🧼');
+  const isChainBreak =
+    !shown.isReady && shown.tone === 'danger' && !isSoapPenalty;
+  const cel =
+    !shown.isReady && !isClockRunning && !isChainBreak
+      ? celebrationText(event)
+      : '';
 
   return (
     <div
@@ -200,6 +206,8 @@ export function ActivityBox({
             </div>
           ) : isClockRunning ? (
             <ClockRunningTop timeLeft={timeLeft ?? 0} />
+          ) : isChainBreak ? (
+            <ChainBreakReason reason={chainBreakReason(shown.msg)} />
           ) : (
             event && cel && (
               <div key={`cel-${event.id}`} className="pinball-celebration">
@@ -223,6 +231,8 @@ export function ActivityBox({
             <Marquee text={READY_MARQUEE_LINE} />
           ) : isClockRunning ? (
             <ClockRunningBottom />
+          ) : isChainBreak ? (
+            <ChainBrokenIndicator key={`cb-${shown.msg}`} />
           ) : (
             <PlayingStatus msg={shown.msg} tone={shown.tone} />
           )}
@@ -274,52 +284,80 @@ function ClockRunningBottom() {
 function PlayingStatus({ msg, tone }: { msg: string; tone: StatusTone }) {
   // Game-over status reads "Time! See your full chain below." — flank
   // with stopwatch emojis so the moment lands as deliberate, not a
-  // generic success message.
+  // generic success message. Chain-break messages are handled separately
+  // by the ActivityBox split-layout branch and never reach this component.
   const isGameOver = msg.startsWith('Time!');
 
   return (
     <div
+      className="pinball-status"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
+        fontSize: '19px',
+        lineHeight: 1.3,
+        color: pinballColor(tone),
+        fontWeight: tone === 'info' || tone === 'warning' ? 600 : 500,
+        textAlign: 'center',
+        display: 'inline-flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: isGameOver ? '12px' : 0,
         position: 'relative',
         zIndex: 1,
       }}
     >
-      <div
-        className="pinball-status"
-        style={{
-          fontSize: '19px',
-          lineHeight: 1.3,
-          color: pinballColor(tone),
-          fontWeight: tone === 'info' || tone === 'warning' ? 600 : 500,
-          textAlign: 'center',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: isGameOver ? '12px' : 0,
-        }}
-      >
-        {isGameOver && (
-          <span className="time-emoji" aria-hidden="true">⏱️</span>
-        )}
-        <span>{msg}</span>
-        {isGameOver && (
-          <span className="time-emoji" aria-hidden="true">⏱️</span>
-        )}
-      </div>
-      {/* Broken-chain icon: shows on any chain-break (tone='danger') that
-          isn't a soap penalty (those carry their own 🧼 already). */}
-      {tone === 'danger' && !msg.startsWith('🧼') && (
-        <div
-          key={`bc-${msg}`}
-          className="broken-chain-icon"
-          aria-hidden="true"
-        >
-          ⛓️‍💥
-        </div>
+      {isGameOver && (
+        <span className="time-emoji" aria-hidden="true">⏱️</span>
       )}
+      <span>{msg}</span>
+      {isGameOver && (
+        <span className="time-emoji" aria-hidden="true">⏱️</span>
+      )}
+    </div>
+  );
+}
+
+/** Strip the trailing " Chain broken." (or any " ... Chain broken.") suffix
+ * from a chain-break status message so the top half can display only the
+ * reason — the bottom half handles the "Chain Broken" announcement. */
+function chainBreakReason(msg: string): string {
+  return msg.replace(/[.\s]*chain broken\.?[\s]*$/i, '').trim();
+}
+
+function ChainBreakReason({ reason }: { reason: string }) {
+  return (
+    <div
+      className="pinball-status"
+      style={{
+        fontSize: '19px',
+        lineHeight: 1.3,
+        color: 'var(--gapplet-pinball-danger)',
+        fontWeight: 500,
+        textAlign: 'center',
+        padding: '0 6px',
+      }}
+    >
+      {reason}
+    </div>
+  );
+}
+
+function ChainBrokenIndicator() {
+  return (
+    <div
+      className="pinball-status"
+      style={{
+        fontSize: '19px',
+        lineHeight: 1.2,
+        color: 'var(--gapplet-pinball-danger)',
+        fontWeight: 700,
+        textAlign: 'center',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '12px',
+      }}
+    >
+      <span className="broken-chain-icon" aria-hidden="true">⛓️‍💥</span>
+      <span>Chain Broken</span>
+      <span className="broken-chain-icon" aria-hidden="true">⛓️‍💥</span>
     </div>
   );
 }
