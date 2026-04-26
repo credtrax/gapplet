@@ -142,7 +142,7 @@ export function App() {
   const [statusTone, setStatusTone] = useState<MessageTone>('info');
 
   // --- End-of-game score submission ---
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const [submission, setSubmission] = useState<SubmissionState>({ status: 'idle' });
 
   // --- How-to-play tutorial ---
@@ -758,7 +758,9 @@ export function App() {
           isReady={!timerStarted && !gameOver}
           readyTopLine={
             session
-              ? 'Ready for you to start'
+              ? profile?.display_name
+                ? `Ready for you to start, ${profile.display_name}.`
+                : 'Ready for you to start'
               : 'Sign in to save your score to the leaderboard'
           }
         />

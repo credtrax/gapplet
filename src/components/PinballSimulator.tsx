@@ -31,7 +31,16 @@ type Scenario = {
 const SCENARIOS: Scenario[] = [
   // --- State ---
   {
-    label: 'Ready (signed in)',
+    label: 'Ready (signed in, named)',
+    category: 'State',
+    msg: 'Ready — drag a tile, or tap a cell, to start.',
+    tone: 'info',
+    isReady: true,
+    event: null,
+    readyTopLine: 'Ready for you to start, Joseph Corn.',
+  },
+  {
+    label: 'Ready (signed in, no name)',
     category: 'State',
     msg: 'Ready — drag a tile, or tap a cell, to start.',
     tone: 'info',
