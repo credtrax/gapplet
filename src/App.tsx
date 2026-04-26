@@ -756,6 +756,11 @@ export function App() {
           statusMessage={statusMessage}
           tone={statusTone}
           isReady={!timerStarted && !gameOver}
+          readyTopLine={
+            session
+              ? 'Ready for you to start'
+              : 'Sign in to save your score to the leaderboard'
+          }
         />
 
         <VirtualKeyboard

@@ -24,17 +24,29 @@ type Scenario = {
   tone: Tone;
   isReady: boolean;
   event: Omit<ActivityEvent, 'id'> | null;
+  /** Optional override for the ready-state top line. */
+  readyTopLine?: string;
 };
 
 const SCENARIOS: Scenario[] = [
   // --- State ---
   {
-    label: 'Ready (game start)',
+    label: 'Ready (signed in)',
     category: 'State',
     msg: 'Ready — drag a tile, or tap a cell, to start.',
     tone: 'info',
     isReady: true,
     event: null,
+    readyTopLine: 'Ready for you to start',
+  },
+  {
+    label: 'Ready (signed out)',
+    category: 'State',
+    msg: 'Ready — drag a tile, or tap a cell, to start.',
+    tone: 'info',
+    isReady: true,
+    event: null,
+    readyTopLine: 'Sign in to save your score to the leaderboard',
   },
   {
     label: 'Clock running',
@@ -281,6 +293,7 @@ export function PinballSimulator() {
         statusMessage={current.msg}
         tone={current.tone}
         isReady={current.isReady}
+        readyTopLine={current.readyTopLine}
       />
 
       <div

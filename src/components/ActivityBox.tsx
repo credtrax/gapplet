@@ -46,6 +46,10 @@ type Props = {
   tone: StatusTone;
   /** True when the game hasn't started yet (no clock running, no game-over). */
   isReady: boolean;
+  /** Optional override for the ready-state top line. Defaults to the
+   * generic "Ready for you to start". App swaps in a sign-in nudge
+   * when the player isn't authenticated. */
+  readyTopLine?: string;
 };
 
 function pinballColor(tone: StatusTone): string {
@@ -60,7 +64,7 @@ function pinballColor(tone: StatusTone): string {
 
 const FADE_MS = 350;
 
-const READY_TOP_LINE = 'Ready for you to start';
+const DEFAULT_READY_TOP_LINE = 'Ready for you to start';
 const READY_MARQUEE_LINE = 'Drag a tile or tap a cell to start.';
 
 /**
@@ -83,14 +87,22 @@ type ShownState = {
   msg: string;
   tone: StatusTone;
   isReady: boolean;
+  readyTopLine: string;
   visible: boolean;
 };
 
-export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
+export function ActivityBox({
+  event,
+  statusMessage,
+  tone,
+  isReady,
+  readyTopLine = DEFAULT_READY_TOP_LINE,
+}: Props) {
   const [shown, setShown] = useState<ShownState>({
     msg: statusMessage,
     tone,
     isReady,
+    readyTopLine,
     visible: true,
   });
 
@@ -98,16 +110,26 @@ export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
     if (
       statusMessage === shown.msg &&
       tone === shown.tone &&
-      isReady === shown.isReady
+      isReady === shown.isReady &&
+      readyTopLine === shown.readyTopLine
     ) {
       return;
     }
     setShown((s) => ({ ...s, visible: false }));
     const t = setTimeout(() => {
-      setShown({ msg: statusMessage, tone, isReady, visible: true });
+      setShown({ msg: statusMessage, tone, isReady, readyTopLine, visible: true });
     }, FADE_MS);
     return () => clearTimeout(t);
-  }, [statusMessage, tone, isReady, shown.msg, shown.tone, shown.isReady]);
+  }, [
+    statusMessage,
+    tone,
+    isReady,
+    readyTopLine,
+    shown.msg,
+    shown.tone,
+    shown.isReady,
+    shown.readyTopLine,
+  ]);
 
   const cel = !shown.isReady ? celebrationText(event) : '';
 
@@ -153,9 +175,10 @@ export function ActivityBox({ event, statusMessage, tone, isReady }: Props) {
                 color: 'var(--gapplet-pinball-accent)',
                 fontWeight: 600,
                 textAlign: 'center',
+                padding: '0 6px',
               }}
             >
-              {READY_TOP_LINE}
+              {shown.readyTopLine}
             </div>
           ) : (
             event && cel && (
