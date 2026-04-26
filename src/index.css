@@ -102,6 +102,40 @@
 }
 
 /* ----------------------------------------------------------------------
+ * Gap drop indicators — vertical bars that appear in the seams between
+ * tiles (and at the edges) when a letter is being dragged AND the board
+ * has a space to absorb the shift. Pulse to draw attention; switch to
+ * sustained bright-glow on hover.
+ * -------------------------------------------------------------------- */
+@keyframes gapplet-gap-pulse {
+  0%, 100% {
+    opacity: 0.45;
+    box-shadow: 0 0 4px 0 rgba(5, 150, 105, 0.3);
+  }
+  50% {
+    opacity: 0.95;
+    box-shadow: 0 0 16px 3px rgba(5, 150, 105, 0.65);
+  }
+}
+
+.gapplet-gap-indicator {
+  width: 4px;
+  height: 60%;
+  background: var(--gapplet-success);
+  border-radius: 2px;
+  animation: gapplet-gap-pulse 1.4s ease-in-out infinite;
+  transition: width 0.15s ease-out, height 0.15s ease-out;
+}
+
+.gapplet-gap-indicator--hover {
+  width: 5px;
+  height: 90%;
+  opacity: 1;
+  box-shadow: 0 0 18px 4px rgba(5, 150, 105, 0.7);
+  animation: none;
+}
+
+/* ----------------------------------------------------------------------
  * Dirty-cell pulse — yellow ring that throbs to signal uncommitted edits.
  * Box-shadow stack includes the base tile shadows so the tile stays
  * raised while the ring pulses.

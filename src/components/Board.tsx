@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { LETTER_VALUES, SPACE } from '../lib/letterValues';
 import { useDrag, DROP_TARGET_ATTR, DROP_GAP_ATTR } from '../lib/drag';
 
@@ -40,6 +41,48 @@ export function Board({ board, selectedIdx, idle, onCellClick }: BoardProps) {
   const isLetterDrag = dragState.active?.kind === 'letter';
   const gapsVisible = hasSpace && isLetterDrag;
 
+  const isGapHovered = (g: number) =>
+    dragState.hoverTarget?.kind === 'gap' && dragState.hoverTarget.idx === g;
+
+  // Layout: [gap0] [cell0] [gap1] [cell1] [gap2] [cell2] [gap3] [cell3] [gap4]
+  //         [cell4] [gap5]. Edge gaps (0 and 5) extend the insert mechanic
+  //         to cover "in front of all letters" / "behind all letters" — the
+  //         shift math in App.handleDrop already handles them.
+  const elements: ReactNode[] = [];
+  for (let i = 0; i < board.length; i++) {
+    elements.push(
+      <GapZone
+        key={`gap-${i}`}
+        gapIdx={i}
+        visible={gapsVisible}
+        hovered={isGapHovered(i)}
+      />
+    );
+    elements.push(
+      renderCell({
+        ch: board[i],
+        i,
+        isSelected: i === selectedIdx,
+        isDragTarget:
+          dragState.hoverTarget?.kind === 'cell' && dragState.hoverTarget.idx === i,
+        isDragSource:
+          dragState.active?.kind === 'board-cell' && dragState.active.idx === i,
+        idle,
+        onCellClick,
+        startDrag,
+      })
+    );
+  }
+  // Trailing gap (g=5), after the last cell.
+  elements.push(
+    <GapZone
+      key={`gap-${board.length}`}
+      gapIdx={board.length}
+      visible={gapsVisible}
+      hovered={isGapHovered(board.length)}
+    />
+  );
+
   return (
     <div
       style={{
@@ -51,44 +94,7 @@ export function Board({ board, selectedIdx, idle, onCellClick }: BoardProps) {
       role="grid"
       aria-label="Joe's Word Nerd board"
     >
-      {board.map((ch, i) => {
-        const cell = renderCell({
-          ch,
-          i,
-          isSelected: i === selectedIdx,
-          isDragTarget:
-            dragState.hoverTarget?.kind === 'cell' && dragState.hoverTarget.idx === i,
-          isDragSource:
-            dragState.active?.kind === 'board-cell' && dragState.active.idx === i,
-          idle,
-          onCellClick,
-          startDrag,
-        });
-        // Insert a gap zone after every cell except the last.
-        if (i === board.length - 1) return cell;
-        const gapIdx = i + 1;
-        const gap = (
-          <GapZone
-            key={`gap-${gapIdx}`}
-            gapIdx={gapIdx}
-            visible={gapsVisible}
-            hovered={
-              dragState.hoverTarget?.kind === 'gap' &&
-              dragState.hoverTarget.idx === gapIdx
-            }
-          />
-        );
-        // Return the cell + the gap zone as siblings; React handles flat keys.
-        return (
-          <span
-            key={`pair-${i}`}
-            style={{ display: 'contents' }}
-          >
-            {cell}
-            {gap}
-          </span>
-        );
-      })}
+      {elements}
     </div>
   );
 }
@@ -182,12 +188,13 @@ function renderCell({
 }
 
 /**
- * Drop zone between two cells. Always 10 px wide so the board layout
- * stays geometrically identical to the previous CSS-grid gap. The
- * vertical-line indicator only renders when `visible` is true (drag
- * active + space in play) — closed gaps are inert visually but still
- * detected by elementFromPoint, so accidental drops still register
- * (App.handleDrop bails when k < 0, i.e. no space to shift into).
+ * Drop zone in a seam between cells (or at the board edges). Always 10 px
+ * wide so the geometry is consistent and elementFromPoint reliably hits
+ * the right zone. Visible-state indicator pulses to draw attention; on
+ * hover the pulse is replaced with a sustained brighter glow.
+ *
+ * Closed gaps are inert visually but still detected (App.handleDrop bails
+ * when no space exists to shift into).
  */
 function GapZone({
   gapIdx,
@@ -209,21 +216,15 @@ function GapZone({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        // touchAction prevents scroll-vs-drop conflicts on touch devices.
         touchAction: 'none',
       }}
     >
       {visible && (
         <div
-          style={{
-            width: '3px',
-            height: hovered ? '85%' : '40%',
-            background: hovered ? 'var(--gapplet-success)' : 'var(--gapplet-border)',
-            borderRadius: '2px',
-            opacity: hovered ? 1 : 0.55,
-            boxShadow: hovered ? '0 0 12px 2px rgba(5, 150, 105, 0.55)' : 'none',
-            transition: 'all 0.15s ease-out',
-          }}
+          className={
+            'gapplet-gap-indicator' +
+            (hovered ? ' gapplet-gap-indicator--hover' : '')
+          }
         />
       )}
     </div>
