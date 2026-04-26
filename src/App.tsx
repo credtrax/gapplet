@@ -704,6 +704,15 @@ export function App() {
     })
     .join('  →  ');
 
+  /** Full game-over chain text for the post-game marquee — every history
+   * entry as its 5-cell board, joined with arrows. Skip restart-chain
+   * markers (restructured: true) so the marquee shows a clean linear
+   * walk from seed → final position. */
+  const gameOverChainText = history
+    .filter((h) => !h.restructured)
+    .map((h) => h.board.map((c) => (c === SPACE ? '·' : c)).join(''))
+    .join(' → ');
+
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
@@ -781,6 +790,7 @@ export function App() {
           isReady={!timerStarted && !gameOver}
           timeLeft={timeLeft}
           soapPenaltyRemaining={soapPenaltyRemaining}
+          gameOverChain={gameOver ? gameOverChainText : undefined}
           readyTopLine={
             session
               ? profile?.display_name

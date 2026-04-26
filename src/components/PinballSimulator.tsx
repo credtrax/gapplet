@@ -31,6 +31,8 @@ type Scenario = {
   /** When true, clicking this scenario kicks off the 5-second soap-penalty
    * countdown so the bubbles + countdown UI can be previewed live. */
   triggersSoapPenalty?: boolean;
+  /** Sample chain text to render in the game-over marquee. */
+  gameOverChain?: string;
 };
 
 const SCENARIOS: Scenario[] = [
@@ -266,6 +268,8 @@ const SCENARIOS: Scenario[] = [
     tone: 'success',
     isReady: false,
     event: null,
+    gameOverChain:
+      'WATER → WAVER → WAVES → WAGES → SAGES → SAVES → SAVED → SLAVED → SHAVED → SHADED → SHAMED → SHAMES → SHARES',
   },
 ];
 
@@ -341,6 +345,7 @@ export function PinballSimulator() {
         readyTopLine={current.readyTopLine}
         timeLeft={current.timeLeft}
         soapPenaltyRemaining={soapRemaining}
+        gameOverChain={current.gameOverChain}
       />
 
       <div

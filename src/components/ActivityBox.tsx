@@ -59,6 +59,11 @@ type Props = {
    * green countdown and animated bubbles. Updates re-render the
    * countdown text directly — no cross-fade per tick. */
   soapPenaltyRemaining?: number;
+  /** Pre-formatted chain text for the game-over marquee. Typically
+   * "WATER → BREAD → BREED → ...". When the status message starts with
+   * "Time!" and this is non-empty, the panel splits: stopwatch-flanked
+   * message on top, scrolling chain on the bottom. */
+  gameOverChain?: string;
 };
 
 function pinballColor(tone: StatusTone): string {
@@ -121,6 +126,7 @@ export function ActivityBox({
   readyTopLine = DEFAULT_READY_TOP_LINE,
   timeLeft,
   soapPenaltyRemaining = 0,
+  gameOverChain,
 }: Props) {
   const isSoapActive = soapPenaltyRemaining > 0;
   const [shown, setShown] = useState<ShownState>({
@@ -169,10 +175,19 @@ export function ActivityBox({
 
   const isClockRunning =
     !shown.isReady && !shown.isSoapActive && shown.msg.startsWith('Clock running');
+  const isGameOver =
+    !shown.isReady && !shown.isSoapActive && shown.msg.startsWith('Time!');
   const isChainBreak =
-    !shown.isReady && !shown.isSoapActive && shown.tone === 'danger';
+    !shown.isReady &&
+    !shown.isSoapActive &&
+    !isGameOver &&
+    shown.tone === 'danger';
   const cel =
-    !shown.isReady && !shown.isSoapActive && !isClockRunning && !isChainBreak
+    !shown.isReady &&
+    !shown.isSoapActive &&
+    !isClockRunning &&
+    !isGameOver &&
+    !isChainBreak
       ? celebrationText(event)
       : '';
 
@@ -227,6 +242,8 @@ export function ActivityBox({
             <SoapPenaltyTop />
           ) : isClockRunning ? (
             <ClockRunningTop timeLeft={timeLeft ?? 0} />
+          ) : isGameOver ? (
+            <GameOverTop msg={shown.msg} />
           ) : isChainBreak ? (
             <ChainBreakReason reason={chainBreakReason(shown.msg)} />
           ) : (
@@ -254,6 +271,8 @@ export function ActivityBox({
             <SoapCountdown remaining={soapPenaltyRemaining} />
           ) : isClockRunning ? (
             <ClockRunningBottom />
+          ) : isGameOver && gameOverChain ? (
+            <Marquee text={gameOverChain} />
           ) : isChainBreak ? (
             <ChainBrokenIndicator key={`cb-${shown.msg}`} />
           ) : (
@@ -290,6 +309,28 @@ function ClockRunningTop({ timeLeft }: { timeLeft: number }) {
     >
       <span className="time-emoji" aria-hidden="true">⏱️</span>
       <span>Clock Running &nbsp; {fmtClock(timeLeft)} remaining</span>
+      <span className="time-emoji" aria-hidden="true">⏱️</span>
+    </div>
+  );
+}
+
+function GameOverTop({ msg }: { msg: string }) {
+  return (
+    <div
+      className="pinball-status"
+      style={{
+        fontSize: '19px',
+        lineHeight: 1.3,
+        color: 'var(--gapplet-pinball-success)',
+        fontWeight: 500,
+        textAlign: 'center',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '12px',
+      }}
+    >
+      <span className="time-emoji" aria-hidden="true">⏱️</span>
+      <span>{msg}</span>
       <span className="time-emoji" aria-hidden="true">⏱️</span>
     </div>
   );
