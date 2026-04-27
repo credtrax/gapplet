@@ -11,8 +11,9 @@
  *   - Filters to 1–5 letter words
  *   - Applies scripts/blocklist.txt (LDNOOBW English) to remove slurs
  *     and obscene terms
- * Regenerated on 2026-04-23. 13551 entries (FUCKS, RAPES manually removed
- * 2026-04-26 alongside their addition to scripts/blocklist.txt).
+ * Regenerated on 2026-04-23. 13549 entries (FUCKS, RAPES, RAPED, RAPER
+ * manually removed 2026-04-26 alongside their addition to
+ * scripts/blocklist.txt).
  *
  * DO NOT hand-edit this file. Any manual change will be clobbered on the
  * next regeneration. If you need to allow a specific blocked word back
@@ -9462,8 +9463,6 @@ RANKS
 RANT
 RANTS
 RAP
-RAPED
-RAPER
 RAPHE
 RAPID
 RAPS
