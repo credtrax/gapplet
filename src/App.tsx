@@ -36,6 +36,14 @@ export type HistoryEntry = {
   minuteUsed: number | null;
   restructured?: boolean;
   chainAfter: number;
+  /**
+   * Soap-penalty marker. Set on history entries that represent a
+   * blocklisted-word attempt (chain broke, no actual commit). The board
+   * value stays at the previously-committed state; the attempted word is
+   * intentionally NOT recorded to keep "(CENSORED)" working downstream.
+   * Filtered out at submission time so the server never sees these.
+   */
+  soapPenalty?: boolean;
 };
 
 type MessageTone = 'info' | 'success' | 'warning' | 'danger' | null;
@@ -208,12 +216,17 @@ export function App() {
       return;
     }
 
-    const moves = history.slice(1).map((h) => ({
-      board: h.board,
-      hinted: h.hinted,
-      minuteUsed: h.minuteUsed as 1 | 2 | null,
-      restructured: h.restructured ?? false,
-    }));
+    // Soap-penalty entries are local-only markers — drop them before
+    // posting so the Edge Function only sees real moves it can validate.
+    const moves = history
+      .slice(1)
+      .filter((h) => !h.soapPenalty)
+      .map((h) => ({
+        board: h.board,
+        hinted: h.hinted,
+        minuteUsed: h.minuteUsed as 1 | 2 | null,
+        restructured: h.restructured ?? false,
+      }));
     if (moves.length === 0) return;
 
     setSubmission({ status: 'submitting' });
@@ -426,6 +439,23 @@ export function App() {
           `🧼 Naughty Word - chain broken. ${SOAP_PENALTY_SECONDS} second cleansing penalty 🧼`
         );
         setStatusTone('danger');
+        // Drop a soap-penalty marker into history so the share emit and
+        // the post-game chain marquee can reflect that the player tried
+        // a blocklisted word (rendered as 🧼 / "(CENSORED)" downstream).
+        // The board stays at prev — soap penalties don't actually commit.
+        setHistory((p) => [
+          ...p,
+          {
+            board: prev.slice(),
+            words: [],
+            points: 0,
+            initial: false,
+            hinted: false,
+            minuteUsed: null,
+            chainAfter: CHAIN_START,
+            soapPenalty: true,
+          },
+        ]);
         return;
       }
       setStatusMessage(`${v.reason}. Chain broken.`);
@@ -705,12 +735,17 @@ export function App() {
     .join('  →  ');
 
   /** Full game-over chain text for the post-game marquee — every history
-   * entry as its 5-cell board, joined with arrows. Skip restart-chain
-   * markers (restructured: true) so the marquee shows a clean linear
-   * walk from seed → final position. */
+   * entry as its 5-cell board, joined with arrows. Restart-chain markers
+   * (restructured: true) are skipped so the marquee shows a clean linear
+   * walk; soap-penalty markers render as "(CENSORED) 🧼" so the player
+   * can see their stumble without exposing the offending word. */
   const gameOverChainText = history
     .filter((h) => !h.restructured)
-    .map((h) => h.board.map((c) => (c === SPACE ? '·' : c)).join(''))
+    .map((h) =>
+      h.soapPenalty
+        ? '(CENSORED) 🧼'
+        : h.board.map((c) => (c === SPACE ? '·' : c)).join('')
+    )
     .join(' → ');
 
   // ------------------------------------------------------------------

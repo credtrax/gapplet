@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { HistoryEntry } from '../App';
 import { findNeighbors, boardKey, createdInteriorSplit } from '../lib/game';
 
-const SHARE_URL = 'https://gapplet.joecorn.com';
+const SHARE_URL = 'https://joecorn.com';
+const APP_NAME = "Joe's Word Nerd";
 
 type Props = {
   history: HistoryEntry[];
@@ -22,6 +23,7 @@ type Props = {
  * played today's puzzle can see the shape of the game but not the content.
  *
  * Emoji cascade per move (highest priority first):
+ *   🧼  Soap penalty — player attempted a blocklisted word (CENSORED)
  *   🟦  Restart Chain
  *   🟥  Move landed on a dead-end (board has zero unused one-swap neighbors)
  *   🟢  Star move — created an interior space split (index 1/2/3)
@@ -48,6 +50,14 @@ export function ShareButton({
       const m = history[i];
       const prev = history[i - 1].board;
 
+      if (m.soapPenalty) {
+        // Blocklisted-word attempt. Doesn't change the board, doesn't add
+        // a chain — just a 🧼 marker in the timeline. The actual word
+        // stays (CENSORED) — never exposed to the share output.
+        emojis.push('🧼');
+        continue;
+      }
+
       if (m.restructured) {
         emojis.push('🟦');
         chainCount++;
@@ -73,11 +83,15 @@ export function ShareButton({
     }
 
     const header = hardMode
-      ? `Gapplet ${seedDate} · HARD`
-      : `Gapplet ${seedDate}`;
+      ? `${APP_NAME} ${seedDate} · HARD`
+      : `${APP_NAME} ${seedDate}`;
 
     const chainLabel = hardMode ? '' : `${chainCount} chain${chainCount === 1 ? '' : 's'} · `;
-    const stats = `${finalScore} pts · ${chainLabel}×${chainPeak.toFixed(1)} peak · ${history.length - 1} moves`;
+    // Move count excludes soap-penalty markers — they're events, not
+    // committed moves. Restart-chain markers stay in the count since the
+    // board does change (back to seed).
+    const moveCount = history.slice(1).filter((h) => !h.soapPenalty).length;
+    const stats = `${finalScore} pts · ${chainLabel}×${chainPeak.toFixed(1)} peak · ${moveCount} moves`;
 
     return [header, stats, emojis.join(''), SHARE_URL].join('\n');
   };

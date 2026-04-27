@@ -269,7 +269,7 @@ const SCENARIOS: Scenario[] = [
     isReady: false,
     event: null,
     gameOverChain:
-      'WATER → WAVER → WAVES → WAGES → SAGES → SAVES → SAVED → SLAVED → SHAVED → SHADED → SHAMED → SHAMES → SHARES',
+      'WATER → WAVER → WAVES → WAGES → SAGES → (CENSORED) 🧼 → SAVES → SAVED → SLAVED → SHAVED → SHADED → SHAMED → SHAMES → SHARES',
   },
 ];
 
