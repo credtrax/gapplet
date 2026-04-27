@@ -205,12 +205,17 @@ function GapZone({
   visible: boolean;
   hovered: boolean;
 }) {
+  // Edge gaps (before cell 0 and after cell 4) get a wider hit area —
+  // on mobile the leftmost/rightmost columns sit right against the page
+  // padding and a fingertip can't reliably target a 10 px sliver.
+  // Interior gaps stay narrow so cells keep their breathing room.
+  const isEdge = gapIdx === 0 || gapIdx === 5;
   return (
     <div
       {...{ [DROP_GAP_ATTR]: gapIdx }}
       aria-hidden="true"
       style={{
-        width: '10px',
+        width: isEdge ? '22px' : '10px',
         height: '110px',
         flexShrink: 0,
         display: 'flex',
