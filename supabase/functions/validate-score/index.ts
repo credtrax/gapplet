@@ -102,6 +102,88 @@ function detectRemoveIdx(prev: Board, curr: Board): number | null {
   return null;
 }
 
+/**
+ * True iff `curr` is a swap of two cells in `prev` — exactly two indices
+ * differ and the values at those indices are exchanged. Both cells can be
+ * letters (letter↔letter swap) OR one can be a space (letter↔space, the
+ * "shift" variant of swap), since the structural test is identical.
+ *
+ * Drag-input mechanic: the player picks a board cell up and drops it on
+ * another. Star-move detection (createdInteriorSplit) still fires
+ * downstream if the swap moves a letter out of an interior cell.
+ */
+function detectSwap(prev: Board, curr: Board): boolean {
+  let a = -1;
+  let b = -1;
+  for (let i = 0; i < 5; i++) {
+    if (prev[i] !== curr[i]) {
+      if (a === -1) a = i;
+      else if (b === -1) b = i;
+      else return false; // more than two cells changed
+    }
+  }
+  if (a === -1 || b === -1) return false;
+  return prev[a] === curr[b] && prev[b] === curr[a];
+}
+
+/**
+ * True iff `curr` is a gap-insert transformation of `prev` — a new letter
+ * was inserted at some gap position, with the existing space being absorbed
+ * by the resulting shift. Two cases (k = index of the prev space, g = gap
+ * index where the letter was inserted, 0..5):
+ *
+ *   g ≤ k  → cells [g, k-1] of prev shift right by 1 to fill [g+1, k] of
+ *            curr; new letter lands at curr[g].
+ *   g > k  → cells [k+1, g-1] of prev shift left by 1 to fill [k, g-2] of
+ *            curr; new letter lands at curr[g-1].
+ *
+ * Either way: prev has exactly one space, curr has none. Cells outside the
+ * affected range are unchanged.
+ */
+function detectGapInsert(prev: Board, curr: Board): boolean {
+  let spacesPrev = 0;
+  let k = -1;
+  for (let i = 0; i < 5; i++) {
+    if (prev[i] === SPACE) {
+      spacesPrev++;
+      k = i;
+    }
+  }
+  if (spacesPrev !== 1) return false;
+  for (const c of curr) {
+    if (c === SPACE) return false;
+  }
+
+  for (let g = 0; g <= 5; g++) {
+    let ok = true;
+    if (g <= k) {
+      // Right-shift case.
+      for (let i = 0; i < g && ok; i++) {
+        if (curr[i] !== prev[i]) ok = false;
+      }
+      for (let i = k + 1; i < 5 && ok; i++) {
+        if (curr[i] !== prev[i]) ok = false;
+      }
+      for (let i = g + 1; i <= k && ok; i++) {
+        if (curr[i] !== prev[i - 1]) ok = false;
+      }
+    } else {
+      // Left-shift case.
+      for (let i = 0; i < k && ok; i++) {
+        if (curr[i] !== prev[i]) ok = false;
+      }
+      for (let i = g; i < 5 && ok; i++) {
+        if (curr[i] !== prev[i]) ok = false;
+      }
+      for (let i = k; i <= g - 2 && ok; i++) {
+        if (curr[i] !== prev[i + 1]) ok = false;
+      }
+    }
+    if (ok) return true;
+  }
+  return false;
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -208,13 +290,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (diffs === 1) {
       changedIdx = [0, 1, 2, 3, 4].find((k) => board[k] !== m.board[k]) ?? null;
     } else {
-      // Must be a Remove-shift pattern. Hints never Remove-shift.
+      // Multi-cell change. Must match one of the structural patterns the
+      // drag-input model produces: Remove (shift to trailing space), Swap
+      // (two cells exchanged), or Gap-insert (one space absorbed by a
+      // shift around it). Hints are always single-cell — reject any
+      // multi-cell hint outright.
       if (m.hinted) {
         return err(400, `move ${i}: hinted move changed >1 cell`, i);
       }
-      const removeIdx = detectRemoveIdx(board, m.board);
-      if (removeIdx === null) {
-        return err(400, `move ${i}: changed ${diffs} cells, not a valid Remove`, i);
+      const isRemove = detectRemoveIdx(board, m.board) !== null;
+      const isSwap = !isRemove && detectSwap(board, m.board);
+      const isGapInsert = !isRemove && !isSwap && detectGapInsert(board, m.board);
+      if (!isRemove && !isSwap && !isGapInsert) {
+        return err(
+          400,
+          `move ${i}: changed ${diffs} cells, not a valid move pattern`,
+          i,
+        );
       }
     }
 
